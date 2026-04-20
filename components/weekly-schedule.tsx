@@ -82,6 +82,14 @@ export function WeeklySchedule({
             {hourGroups.map((group) =>
               CHANNELS.map((channel, index) => (
                 <tr key={`${group.hour}-${channel}`}>
+                  {(() => {
+                    const channelStyle = {
+                      '--channel-color': getChannelColor(channel),
+                      '--channel-color-soft': `${getChannelColor(channel)}66`,
+                    } as CSSProperties;
+
+                    return (
+                      <>
                   {index === 0 ? (
                     <th className="time-group-cell" rowSpan={CHANNELS.length}>
                       {group.label}
@@ -90,11 +98,7 @@ export function WeeklySchedule({
 
                   <th
                     className="slot-label-cell"
-                    style={
-                      {
-                        '--channel-color': getChannelColor(channel),
-                      } as CSSProperties
-                    }
+                    style={channelStyle}
                   >
                     <span>{channel}</span>
                   </th>
@@ -150,17 +154,15 @@ export function WeeklySchedule({
                     }
 
                     return (
-                      <td key={`${group.hour}-${channel}-${slotDateKey}`} className="slot-cell">
+                      <td
+                        key={`${group.hour}-${channel}-${slotDateKey}`}
+                        className="slot-cell"
+                        style={channelStyle}
+                      >
                         <button
                           type="button"
                           className={className}
-                          style={
-                            visibleBooking
-                              ? ({
-                                  '--channel-color': getChannelColor(channel),
-                                } as CSSProperties)
-                              : undefined
-                          }
+                          style={channelStyle}
                           onClick={() =>
                             selectable
                               ? onSelectSlot({
@@ -178,14 +180,17 @@ export function WeeklySchedule({
                                   ? '관리자에 의해 차단된 날짜입니다'
                                   : inWindow
                                     ? '지난 시간이거나 선택할 수 없는 슬롯입니다'
-                                    : '예약 가능 범위를 벗어난 시작 시각입니다'
+                              : '예약 가능 범위를 벗어난 시작 시각입니다'
                           }
                         >
-                          {visibleBooking ? visibleBooking.applicant : ''}
+                          {visibleBooking ? visibleBooking.applicant : selectable ? '' : '/'}
                         </button>
                       </td>
                     );
                   })}
+                      </>
+                    );
+                  })()}
                 </tr>
               )),
             )}

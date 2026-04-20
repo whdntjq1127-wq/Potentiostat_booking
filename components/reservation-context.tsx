@@ -24,7 +24,7 @@ import {
   type ReservationSnapshot,
 } from '../lib/reservation-data';
 
-const STORAGE_KEY = 'potentiostat-booking-demo-v2';
+const STORAGE_KEY = 'potentiostat-booking-demo-v3';
 
 type ActionResult = {
   ok: boolean;

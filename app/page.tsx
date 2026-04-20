@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useReservation } from '../components/reservation-context';
 import { WeeklySchedule, type SelectedSlot } from '../components/weekly-schedule';
@@ -8,14 +8,25 @@ import {
   addDays,
   formatDateLabel,
   formatDateTimeLabel,
-  formatBookingRange,
+  formatDisplayTime,
   getLatestBookableDate,
-  toDateTimeLocal,
   addHours,
+  formatShortDateLabel,
+  getCoveredDateKeys,
+  getLatestAllowedEnd,
+  overlaps,
+  toDateKey,
 } from '../lib/reservation-data';
 
+type EndOption = {
+  value: string;
+  dateKey: string;
+  dateLabel: string;
+  timeLabel: string;
+};
+
 export default function Home() {
-  const { ready, addBooking, settings } = useReservation();
+  const { ready, addBooking, bookings, blockedDates, settings } = useReservation();
   const [mounted, setMounted] = useState(false);
   const [now, setNow] = useState<Date | null>(null);
   const [weekAnchor, setWeekAnchor] = useState<Date | null>(null);
@@ -45,6 +56,71 @@ export default function Home() {
     setEndAt(selectedSlot.endAt);
   }, [selectedSlot]);
 
+  const availableEndOptions = useMemo<EndOption[]>(() => {
+    if (!selectedSlot) {
+      return [];
+    }
+
+    const start = new Date(selectedSlot.startAt);
+    const latestEnd = getLatestAllowedEnd(start, settings);
+    const options: EndOption[] = [];
+
+    for (
+      let candidate = addHours(start, 1);
+      candidate <= latestEnd;
+      candidate = addHours(candidate, 1)
+    ) {
+      const blockedDate = getCoveredDateKeys(start, candidate).find((dateKey) =>
+        blockedDates.includes(dateKey),
+      );
+
+      if (blockedDate) {
+        break;
+      }
+
+      const hasConflict = bookings.some((booking) => {
+        if (booking.status !== 'active' || booking.channel !== selectedSlot.channel) {
+          return false;
+        }
+
+        return overlaps(
+          start,
+          candidate,
+          new Date(booking.startAt),
+          new Date(booking.endAt),
+        );
+      });
+
+      if (hasConflict) {
+        break;
+      }
+
+      options.push({
+        value: `${toDateKey(candidate)}T${String(candidate.getHours()).padStart(2, '0')}:00`,
+        dateKey: toDateKey(candidate),
+        dateLabel: formatShortDateLabel(candidate),
+        timeLabel: formatDisplayTime(candidate),
+      });
+    }
+
+    return options;
+  }, [blockedDates, bookings, selectedSlot, settings]);
+
+  useEffect(() => {
+    if (!selectedSlot) {
+      return;
+    }
+
+    if (availableEndOptions.length === 0) {
+      setEndAt('');
+      return;
+    }
+
+    if (!availableEndOptions.some((option) => option.value === endAt)) {
+      setEndAt(availableEndOptions[0].value);
+    }
+  }, [availableEndOptions, endAt, selectedSlot]);
+
   if (!ready || !mounted || !now || !weekAnchor) {
     return (
       <main>
@@ -57,6 +133,14 @@ export default function Home() {
   }
 
   const latestBookableDate = getLatestBookableDate(settings, now);
+  const selectedEndDate = endAt ? endAt.split('T')[0] : '';
+  const endDateOptions = availableEndOptions.filter(
+    (option, index, list) =>
+      list.findIndex((candidate) => candidate.dateKey === option.dateKey) === index,
+  );
+  const endTimeOptions = availableEndOptions.filter(
+    (option) => option.dateKey === selectedEndDate,
+  );
 
   return (
     <main className="calendar-page">
@@ -172,16 +256,41 @@ export default function Home() {
               </div>
 
               <div className="field">
-                <label htmlFor="modal-end">장비 사용 종료</label>
-                <input
-                  id="modal-end"
-                  type="datetime-local"
-                  step={3600}
-                  min={toDateTimeLocal(addHours(new Date(selectedSlot.startAt), 1))}
-                  value={endAt}
-                  onChange={(event) => setEndAt(event.target.value)}
-                  required
-                />
+                <label htmlFor="modal-end-date">장비 사용 종료</label>
+                <div className="end-picker-grid">
+                  <select
+                    id="modal-end-date"
+                    value={selectedEndDate}
+                    onChange={(event) => {
+                      const nextOption = availableEndOptions.find(
+                        (option) => option.dateKey === event.target.value,
+                      );
+
+                      if (nextOption) {
+                        setEndAt(nextOption.value);
+                      }
+                    }}
+                    required
+                  >
+                    {endDateOptions.map((option) => (
+                      <option key={option.dateKey} value={option.dateKey}>
+                        {option.dateLabel}
+                      </option>
+                    ))}
+                  </select>
+
+                  <select
+                    value={endAt}
+                    onChange={(event) => setEndAt(event.target.value)}
+                    required
+                  >
+                    {endTimeOptions.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.timeLabel}
+                      </option>
+                    ))}
+                  </select>
+                </div>
               </div>
 
               <div className="field full">

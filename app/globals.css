@@ -551,18 +551,21 @@ button {
 
 .slot-cell {
   min-width: 108px;
+  background: var(--channel-color-soft, transparent);
 }
 
 .slot-button {
   width: 100%;
   min-height: 24px;
   padding: 3px 6px;
-  background: transparent;
+  background: var(--channel-color-soft, transparent);
   color: var(--text);
   font-size: 0.74rem;
+  font-weight: 600;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  opacity: 1;
 }
 
 .slot-button.available {
@@ -570,12 +573,14 @@ button {
 }
 
 .slot-button.available:hover {
-  background: rgba(13, 118, 108, 0.08);
+  background: var(--channel-color, rgba(13, 118, 108, 0.18));
 }
 
 .slot-button.unavailable {
-  background: rgba(228, 236, 232, 0.72);
   cursor: not-allowed;
+  color: rgba(21, 50, 42, 0.7);
+  font-size: 0.9rem;
+  font-weight: 700;
 }
 
 .slot-button.booked {
@@ -687,6 +692,12 @@ button {
   background: rgba(247, 251, 249, 0.92);
 }
 
+.end-picker-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 0.9fr);
+  gap: 10px;
+}
+
 .channel-card {
   box-shadow:
     inset 8px 0 0 var(--channel-color, transparent),
@@ -724,6 +735,10 @@ button {
   }
 
   .inline-booking-form {
+    grid-template-columns: 1fr;
+  }
+
+  .end-picker-grid {
     grid-template-columns: 1fr;
   }
 }

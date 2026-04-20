@@ -255,7 +255,7 @@ export function createInitialReservationState(
 
   return {
     settings: DEFAULT_SETTINGS,
-    blockedDates: [toDateKey(addDays(base, 4))],
+    blockedDates: [],
     notices: [
       '이 사이트는 로그인 없이 이름만 입력해 예약하는 데모 버전입니다.',
       '각 채널은 독립적으로 예약되며, 같은 채널 안에서만 시간 중복이 제한됩니다.',
