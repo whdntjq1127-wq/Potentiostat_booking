@@ -5,16 +5,17 @@ import { useMemo, useState } from 'react';
 import { useReservation } from '../../components/reservation-context';
 import {
   CHANNELS,
+  addHours,
   formatBookingRange,
   getChannelColor,
   getStatusLabel,
+  toDateTimeLocal,
   type Channel,
 } from '../../lib/reservation-data';
 
 type EditDraft = {
   channel: Channel;
   startAt: string;
-  endAt: string;
   purpose: string;
 };
 
@@ -53,7 +54,6 @@ export default function MyBookingsPage() {
     setEditDraft({
       channel: booking.channel,
       startAt: booking.startAt,
-      endAt: booking.endAt,
       purpose: booking.purpose,
     });
     setEditMessage(null);
@@ -148,7 +148,9 @@ export default function MyBookingsPage() {
                         id: booking.id,
                         channel: editDraft.channel,
                         startAt: editDraft.startAt,
-                        endAt: editDraft.endAt,
+                        endAt: toDateTimeLocal(
+                          addHours(new Date(editDraft.startAt), 1),
+                        ),
                         purpose: editDraft.purpose,
                       });
                       setEditMessage(result.message);
@@ -201,26 +203,6 @@ export default function MyBookingsPage() {
                       />
                     </div>
 
-                    <div className="field">
-                      <label htmlFor={`end-${booking.id}`}>종료 시각</label>
-                      <input
-                        id={`end-${booking.id}`}
-                        type="datetime-local"
-                        step={3600}
-                        value={editDraft.endAt}
-                        onChange={(event) =>
-                          setEditDraft((current) =>
-                            current
-                              ? {
-                                  ...current,
-                                  endAt: event.target.value,
-                                }
-                              : current,
-                          )
-                        }
-                      />
-                    </div>
-
                     <div className="field full">
                       <label htmlFor={`purpose-${booking.id}`}>메모</label>
                       <textarea
@@ -237,6 +219,11 @@ export default function MyBookingsPage() {
                           )
                         }
                       />
+                    </div>
+
+                    <div className="inline-note">
+                      예약 시간은 1시간으로 고정됩니다. 선택한 시작 시각 기준으로 자동
+                      계산됩니다.
                     </div>
 
                     <div className="action-row">

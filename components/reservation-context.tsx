@@ -12,10 +12,12 @@ import {
   compareBookings,
   createInitialReservationState,
   fromDateTimeLocal,
+  addHours,
   getCoveredDateKeys,
   getLatestAllowedEnd,
   isStartWithinBookingWindow,
   overlaps,
+  toDateTimeLocal,
   type Booking,
   type Channel,
   type ReservationSettings,
@@ -151,6 +153,14 @@ export function ReservationProvider({ children }: { children: ReactNode }) {
           return { ok: false, message: '종료 시각은 시작 시각보다 뒤여야 합니다.' };
         }
 
+        if (
+          start.getMinutes() !== 0 ||
+          start.getSeconds() !== 0 ||
+          end.getTime() !== addHours(start, 1).getTime()
+        ) {
+          return { ok: false, message: '예약은 정확히 1시간 단위로만 등록할 수 있습니다.' };
+        }
+
         if (!isStartWithinBookingWindow(start, snapshot.settings, new Date())) {
           return {
             ok: false,
@@ -187,12 +197,13 @@ export function ReservationProvider({ children }: { children: ReactNode }) {
         }
 
         const createdAt = new Date();
+        const normalizedEndAt = toDateTimeLocal(addHours(start, 1));
         const newBooking: Booking = {
           id: `bk-${createdAt.getTime()}`,
           applicant: trimmedApplicant,
           channel,
           startAt,
-          endAt,
+          endAt: normalizedEndAt,
           purpose: trimmedPurpose,
           status: 'active',
           createdAt: createdAt.toISOString(),
@@ -224,6 +235,14 @@ export function ReservationProvider({ children }: { children: ReactNode }) {
 
         if (end <= start) {
           return { ok: false, message: '종료 시각은 시작 시각보다 뒤여야 합니다.' };
+        }
+
+        if (
+          start.getMinutes() !== 0 ||
+          start.getSeconds() !== 0 ||
+          end.getTime() !== addHours(start, 1).getTime()
+        ) {
+          return { ok: false, message: '예약은 정확히 1시간 단위로만 수정할 수 있습니다.' };
         }
 
         if (!isStartWithinBookingWindow(start, snapshot.settings, new Date())) {
@@ -270,7 +289,7 @@ export function ReservationProvider({ children }: { children: ReactNode }) {
                     ...booking,
                     channel,
                     startAt,
-                    endAt,
+                    endAt: toDateTimeLocal(addHours(start, 1)),
                     purpose: purpose.trim(),
                   }
                 : booking,

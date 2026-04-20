@@ -9,6 +9,9 @@ import {
   toDateKey,
 } from '../../lib/reservation-data';
 
+const ADMIN_PASSWORD = '001127';
+const ADMIN_SESSION_KEY = 'potentiostat-admin-auth';
+
 export default function AdminPage() {
   const {
     ready,
@@ -29,11 +32,22 @@ export default function AdminPage() {
   const [blockedMessage, setBlockedMessage] = useState<string | null>(null);
   const [noticeInput, setNoticeInput] = useState('');
   const [noticeMessage, setNoticeMessage] = useState<string | null>(null);
+  const [passwordInput, setPasswordInput] = useState('');
+  const [authMessage, setAuthMessage] = useState<string | null>(null);
+  const [authenticated, setAuthenticated] = useState(false);
 
   useEffect(() => {
     setSettingsDraft(settings);
     setBlockedDateInput(toDateKey(new Date()));
   }, [settings]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return;
+    }
+
+    setAuthenticated(window.sessionStorage.getItem(ADMIN_SESSION_KEY) === 'yes');
+  }, []);
 
   if (!ready) {
     return (
@@ -46,15 +60,70 @@ export default function AdminPage() {
     );
   }
 
+  if (!authenticated) {
+    return (
+      <main className="admin-gate-page">
+        <section className="panel admin-gate-card">
+          <div className="eyebrow">관리자 인증</div>
+          <h1 className="section-title">비밀번호를 입력해 관리자 설정에 들어가세요.</h1>
+          <form
+            className="section admin-gate-form"
+            onSubmit={(event) => {
+              event.preventDefault();
+
+              if (passwordInput === ADMIN_PASSWORD) {
+                if (typeof window !== 'undefined') {
+                  window.sessionStorage.setItem(ADMIN_SESSION_KEY, 'yes');
+                }
+                setAuthenticated(true);
+                setAuthMessage(null);
+                setPasswordInput('');
+                return;
+              }
+
+              setAuthMessage('비밀번호가 올바르지 않습니다.');
+            }}
+          >
+            <input
+              type="password"
+              value={passwordInput}
+              onChange={(event) => setPasswordInput(event.target.value)}
+              placeholder="관리자 비밀번호"
+            />
+            <button className="button" type="submit">
+              관리자 페이지 열기
+            </button>
+          </form>
+          {authMessage ? <div className="inline-message error">{authMessage}</div> : null}
+        </section>
+      </main>
+    );
+  }
+
   return (
     <main className="admin-layout">
       <section className="panel">
-        <div className="eyebrow">예약 규칙</div>
-        <h1 className="section-title">관리자 설정</h1>
-        <p className="muted">
-          이 페이지에서는 예약 가능 범위와 최대 사용 기간을 직접 바꿀 수 있습니다.
-          현재 버전은 별도 인증 없이 브라우저에서만 저장되는 데모입니다.
-        </p>
+        <div className="section-head">
+          <div>
+            <div className="eyebrow">예약 규칙</div>
+            <h1 className="section-title">관리자 설정</h1>
+            <p className="muted">
+              이 페이지에서는 예약 가능 범위와 최대 사용 기간을 직접 바꿀 수 있습니다.
+            </p>
+          </div>
+          <button
+            type="button"
+            className="button-ghost"
+            onClick={() => {
+              if (typeof window !== 'undefined') {
+                window.sessionStorage.removeItem(ADMIN_SESSION_KEY);
+              }
+              setAuthenticated(false);
+            }}
+          >
+            잠금
+          </button>
+        </div>
 
         <form
           className="form-grid section"

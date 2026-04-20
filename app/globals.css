@@ -198,6 +198,16 @@ button {
   padding-bottom: 18px;
 }
 
+.calendar-page {
+  min-height: calc(100vh - 150px);
+}
+
+.calendar-panel {
+  min-height: calc(100vh - 170px);
+  display: grid;
+  gap: 16px;
+}
+
 .eyebrow {
   display: inline-flex;
   align-items: center;
@@ -449,6 +459,7 @@ button {
 .schedule-shell {
   display: grid;
   gap: 14px;
+  min-height: 0;
 }
 
 .week-toolbar {
@@ -464,11 +475,12 @@ button {
   border-radius: 20px;
   border: 1px solid var(--line);
   background: rgba(255, 255, 255, 0.84);
+  min-height: 0;
 }
 
 .schedule-table {
   width: 100%;
-  min-width: 980px;
+  min-width: 1080px;
   border-collapse: separate;
   border-spacing: 0;
 }
@@ -491,44 +503,61 @@ button {
 }
 
 .corner-cell,
+.time-group-cell,
 .slot-label-cell {
   position: sticky;
-  left: 0;
   z-index: 2;
   background: #f7fbf9;
 }
 
 .corner-cell {
-  min-width: 132px;
+  z-index: 4;
+}
+
+.time-head,
+.time-group-cell {
+  left: 0;
+  min-width: 108px;
+  width: 108px;
+}
+
+.channel-head,
+.slot-label-cell {
+  left: 108px;
+  min-width: 84px;
+  width: 84px;
+}
+
+.time-group-cell {
+  padding: 6px 8px;
+  text-align: center;
+  font-size: 0.76rem;
+  vertical-align: middle;
+  color: var(--primary-strong);
 }
 
 .slot-label-cell {
-  min-width: 132px;
-  padding: 8px 10px;
-  text-align: left;
+  padding: 6px 8px;
+  text-align: center;
   box-shadow: inset 8px 0 0 var(--channel-color, transparent);
 }
 
-.slot-label-cell span,
-.slot-label-cell small {
+.slot-label-cell span {
   display: block;
-}
-
-.slot-label-cell small {
-  color: var(--muted);
+  font-size: 0.78rem;
 }
 
 .slot-cell {
-  min-width: 122px;
+  min-width: 108px;
 }
 
 .slot-button {
   width: 100%;
-  min-height: 34px;
-  padding: 6px 8px;
+  min-height: 24px;
+  padding: 3px 6px;
   background: transparent;
   color: var(--text);
-  font-size: 0.82rem;
+  font-size: 0.74rem;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -547,6 +576,11 @@ button {
   cursor: not-allowed;
 }
 
+.slot-button.occupied-other {
+  background: rgba(206, 217, 212, 0.92);
+  cursor: not-allowed;
+}
+
 .slot-button.booked {
   background: var(--channel-color, rgba(13, 118, 108, 0.88));
   color: var(--text);
@@ -561,6 +595,74 @@ button {
 
 .lookup-bar {
   max-width: 460px;
+}
+
+.calendar-inline-booking {
+  display: grid;
+  gap: 12px;
+  padding: 14px 16px;
+  border-radius: 18px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.selection-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.selection-card strong {
+  padding: 8px 12px;
+  border-radius: 999px;
+  background: var(--primary-soft);
+  color: var(--primary-strong);
+}
+
+.selection-placeholder,
+.inline-note {
+  color: var(--muted);
+  font-size: 0.92rem;
+}
+
+.inline-booking-form {
+  display: grid;
+  grid-template-columns: minmax(180px, 0.8fr) minmax(220px, 1fr) auto auto;
+  gap: 12px;
+  align-items: center;
+}
+
+.inline-booking-form input {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 12px 14px;
+  background: rgba(255, 255, 255, 0.94);
+  color: var(--text);
+}
+
+.admin-gate-page {
+  display: grid;
+  place-items: center;
+  min-height: calc(100vh - 190px);
+}
+
+.admin-gate-card {
+  width: min(520px, 100%);
+}
+
+.admin-gate-form {
+  display: grid;
+  gap: 12px;
+}
+
+.admin-gate-form input {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 14px 16px;
+  background: rgba(255, 255, 255, 0.94);
 }
 
 .channel-card {
@@ -596,6 +698,10 @@ button {
   .dashboard-grid,
   .hero-card,
   .hero-stats {
+    grid-template-columns: 1fr;
+  }
+
+  .inline-booking-form {
     grid-template-columns: 1fr;
   }
 }

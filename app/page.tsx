@@ -1,47 +1,37 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { BookingForm } from '../components/booking-form';
+import Link from 'next/link';
 import { useReservation } from '../components/reservation-context';
 import { WeeklySchedule, type SelectedSlot } from '../components/weekly-schedule';
 import {
-  CHANNELS,
   addDays,
-  addHours,
-  ceilToHour,
   formatDateLabel,
+  formatBookingRange,
   getLatestBookableDate,
-  toDateKey,
-  toDateTimeLocal,
 } from '../lib/reservation-data';
 
-function createDefaultSlot(now: Date): SelectedSlot {
-  const start = ceilToHour(now);
-  const end = addHours(start, 1);
-
-  return {
-    channel: CHANNELS[0],
-    startAt: toDateTimeLocal(start),
-    endAt: toDateTimeLocal(end),
-  };
-}
-
 export default function Home() {
-  const { ready, blockedDates, notices, settings } = useReservation();
+  const { ready, addBooking, settings } = useReservation();
   const [mounted, setMounted] = useState(false);
   const [now, setNow] = useState<Date | null>(null);
   const [weekAnchor, setWeekAnchor] = useState<Date | null>(null);
   const [selectedSlot, setSelectedSlot] = useState<SelectedSlot | null>(null);
+  const [applicant, setApplicant] = useState('');
+  const [purpose, setPurpose] = useState('');
+  const [message, setMessage] = useState<{
+    ok: boolean;
+    text: string;
+  } | null>(null);
 
   useEffect(() => {
     const current = new Date();
     setNow(current);
     setWeekAnchor(current);
-    setSelectedSlot(createDefaultSlot(current));
     setMounted(true);
   }, []);
 
-  if (!ready || !mounted || !now || !weekAnchor || !selectedSlot) {
+  if (!ready || !mounted || !now || !weekAnchor) {
     return (
       <main>
         <section className="panel">
@@ -55,35 +45,8 @@ export default function Home() {
   const latestBookableDate = getLatestBookableDate(settings, now);
 
   return (
-    <main className="home-stack">
-      <section className="hero-card">
-        <div>
-          <div className="eyebrow">운용 요약</div>
-          <h1 className="section-title">Potentiostat 3채널 통합 예약 보드</h1>
-          <p className="muted">
-            메인 달력에서 원하는 칸을 선택한 뒤 이름만 입력하면 예약할 수 있습니다.
-            같은 시간대에는 채널이 달라도 한 사람만 장비를 운용할 수 있습니다.
-          </p>
-        </div>
-
-        <div className="hero-stats">
-          <article className="stat-card">
-            <strong>3 채널</strong>
-            <span>CH 1 / CH 2 / CH 3</span>
-          </article>
-          <article className="stat-card">
-            <strong>{settings.bookingWindowDays}일</strong>
-            <span>오늘부터 예약 가능한 시작 범위</span>
-          </article>
-          <article className="stat-card">
-            <strong>{settings.maxDurationDays}일</strong>
-            <span>한 번에 예약 가능한 최대 기간</span>
-          </article>
-        </div>
-      </section>
-
-      <section className="dashboard-grid">
-        <div className="panel board-panel">
+    <main className="calendar-page">
+      <section className="panel board-panel calendar-panel">
           <div className="section-head">
             <div>
               <div className="eyebrow">주간 달력</div>
@@ -94,94 +57,98 @@ export default function Home() {
               <span>
                 시작 가능 마감일: {formatDateLabel(latestBookableDate)}
               </span>
+              <span>예약 시간: 1시간 고정</span>
+              <span>
+                <Link href="/my-bookings">내 예약 조회</Link>
+              </span>
             </div>
           </div>
+
+          <div className="calendar-inline-booking">
+            {selectedSlot ? (
+              <>
+                <div className="selection-card">
+                  <strong>{selectedSlot.channel}</strong>
+                  <span>
+                    선택 슬롯: {formatBookingRange(selectedSlot.startAt, selectedSlot.endAt)}
+                  </span>
+                </div>
+
+                <form
+                  className="inline-booking-form"
+                  onSubmit={(event) => {
+                    event.preventDefault();
+
+                    const result = addBooking({
+                      applicant,
+                      channel: selectedSlot.channel,
+                      startAt: selectedSlot.startAt,
+                      endAt: selectedSlot.endAt,
+                      purpose,
+                    });
+
+                    setMessage({ ok: result.ok, text: result.message });
+
+                    if (result.ok) {
+                      setApplicant('');
+                      setPurpose('');
+                      setSelectedSlot(null);
+                    }
+                  }}
+                >
+                  <input
+                    type="text"
+                    value={applicant}
+                    onChange={(event) => setApplicant(event.target.value)}
+                    placeholder="사용자 이름"
+                    required
+                  />
+                  <input
+                    type="text"
+                    value={purpose}
+                    onChange={(event) => setPurpose(event.target.value)}
+                    placeholder="메모"
+                  />
+                  <button className="button" type="submit">
+                    예약 저장
+                  </button>
+                  <button
+                    className="button-ghost"
+                    type="button"
+                    onClick={() => setSelectedSlot(null)}
+                  >
+                    선택 취소
+                  </button>
+                </form>
+              </>
+            ) : (
+              <div className="selection-placeholder">
+                달력에서 비어 있는 칸을 클릭하면 바로 이 자리에서 예약을 등록할 수
+                있습니다.
+              </div>
+            )}
+          </div>
+
+          {message ? (
+            <div className={`inline-message ${message.ok ? 'success' : 'error'}`}>
+              {message.text}
+            </div>
+          ) : null}
 
           <WeeklySchedule
             anchorDate={weekAnchor}
             now={now}
             selectedSlot={selectedSlot}
-            onSelectSlot={setSelectedSlot}
+            onSelectSlot={(slot) => {
+              setSelectedSlot(slot);
+              setMessage(null);
+            }}
             onShiftWeek={(direction) =>
               setWeekAnchor((current) =>
                 current ? addDays(current, direction * 7) : current,
               )
             }
           />
-        </div>
-
-        <div className="side-column">
-          <BookingForm
-            title="빠른 예약 등록"
-            description="달력에서 칸을 클릭하면 시작 시각과 채널이 자동으로 채워집니다."
-            prefill={selectedSlot}
-          />
-
-          <section className="panel">
-            <div className="eyebrow">현재 규칙</div>
-            <h2 className="section-title">예약 조건</h2>
-            <div className="info-list">
-              <div className="info-item">
-                <div className="info-badge">1</div>
-                <div>
-                  <strong>이름만 입력하면 예약 가능</strong>
-                  <p className="muted">로그인 없이 사용자 이름만 필수로 받습니다.</p>
-                </div>
-              </div>
-              <div className="info-item">
-                <div className="info-badge">2</div>
-                <div>
-                  <strong>동시간대 중복 예약 불가</strong>
-                  <p className="muted">
-                    하나의 시간대에는 채널이 달라도 단 한 명만 운용할 수 있습니다.
-                  </p>
-                </div>
-              </div>
-              <div className="info-item">
-                <div className="info-badge">3</div>
-                <div>
-                  <strong>시작 가능 범위</strong>
-                  <p className="muted">
-                    오늘부터 {settings.bookingWindowDays}일 후 날짜까지 시작하는 예약만
-                    허용합니다.
-                  </p>
-                </div>
-              </div>
-              <div className="info-item">
-                <div className="info-badge">4</div>
-                <div>
-                  <strong>최대 사용 기간</strong>
-                  <p className="muted">
-                    한 번의 예약은 최대 {settings.maxDurationDays}일까지만 유지됩니다.
-                  </p>
-                </div>
-              </div>
-            </div>
-          </section>
-
-          <section className="panel">
-            <div className="eyebrow">공지 및 차단일</div>
-            <h2 className="section-title">운용 메모</h2>
-            <div className="chip-row">
-              {blockedDates.length === 0 ? (
-                <span className="chip">차단된 날짜 없음</span>
-              ) : (
-                blockedDates.map((dateKey) => (
-                  <span key={dateKey} className="chip">
-                    {dateKey}
-                  </span>
-                ))
-              )}
-            </div>
-            <div className="notice-list section">
-              {notices.map((notice) => (
-                <div key={notice} className="announcement">
-                  {notice}
-                </div>
-              ))}
-            </div>
-          </section>
-        </div>
       </section>
     </main>
   );

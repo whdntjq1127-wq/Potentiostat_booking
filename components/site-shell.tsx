@@ -6,7 +6,6 @@ import type { ReactNode } from 'react';
 
 const navItems = [
   { href: '/', label: '주간 보드' },
-  { href: '/reserve', label: '예약 등록' },
   { href: '/my-bookings', label: '내 예약 조회' },
   { href: '/admin', label: '관리자 설정' },
 ];
