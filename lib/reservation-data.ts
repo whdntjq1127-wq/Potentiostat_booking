@@ -196,18 +196,17 @@ export function isStartWithinBookingWindow(
   settings: ReservationSettings,
   now = new Date(),
 ) {
-  const today = startOfDay(now);
-  const latest = addDays(today, settings.bookingWindowDays);
-  const startDate = startOfDay(start);
+  const first = ceilToHour(now);
+  const latest = addHours(first, settings.bookingWindowDays * 24);
 
-  return startDate >= today && startDate <= latest;
+  return start >= first && start <= latest;
 }
 
 export function getLatestBookableDate(
   settings: ReservationSettings,
   now = new Date(),
 ) {
-  return addDays(startOfDay(now), settings.bookingWindowDays);
+  return addHours(ceilToHour(now), settings.bookingWindowDays * 24);
 }
 
 export function getLatestAllowedEnd(
@@ -259,8 +258,8 @@ export function createInitialReservationState(
     blockedDates: [toDateKey(addDays(base, 4))],
     notices: [
       '이 사이트는 로그인 없이 이름만 입력해 예약하는 데모 버전입니다.',
-      '동일 시간대에는 한 사람만 장비를 운용할 수 있어 채널이 달라도 중복 예약이 불가능합니다.',
-      '관리자 페이지에서 예약 가능 범위와 최대 사용 기간을 바로 수정할 수 있습니다.',
+      '각 채널은 독립적으로 예약되며, 같은 채널 안에서만 시간 중복이 제한됩니다.',
+      '관리자 페이지에서 시작 가능 범위와 최대 사용 기간을 바로 수정할 수 있습니다.',
     ],
     bookings: bookings.sort(compareBookings),
   };

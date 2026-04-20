@@ -108,7 +108,7 @@ export default function AdminPage() {
             <div className="eyebrow">예약 규칙</div>
             <h1 className="section-title">관리자 설정</h1>
             <p className="muted">
-              이 페이지에서는 예약 가능 범위와 최대 사용 기간을 직접 바꿀 수 있습니다.
+              시작 가능한 예약 범위와 시작 시각 기준 최대 사용 기간을 직접 바꿀 수 있습니다.
             </p>
           </div>
           <button

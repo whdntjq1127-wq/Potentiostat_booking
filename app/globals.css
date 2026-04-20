@@ -539,7 +539,9 @@ button {
 .slot-label-cell {
   padding: 6px 8px;
   text-align: center;
-  box-shadow: inset 8px 0 0 var(--channel-color, transparent);
+  background: var(--channel-color, #f7fbf9);
+  color: #15322a;
+  box-shadow: none;
 }
 
 .slot-label-cell span {
@@ -576,11 +578,6 @@ button {
   cursor: not-allowed;
 }
 
-.slot-button.occupied-other {
-  background: rgba(206, 217, 212, 0.92);
-  cursor: not-allowed;
-}
-
 .slot-button.booked {
   background: var(--channel-color, rgba(13, 118, 108, 0.88));
   color: var(--text);
@@ -595,15 +592,6 @@ button {
 
 .lookup-bar {
   max-width: 460px;
-}
-
-.calendar-inline-booking {
-  display: grid;
-  gap: 12px;
-  padding: 14px 16px;
-  border-radius: 18px;
-  border: 1px solid var(--line);
-  background: rgba(255, 255, 255, 0.72);
 }
 
 .selection-card {
@@ -624,6 +612,10 @@ button {
 .inline-note {
   color: var(--muted);
   font-size: 0.92rem;
+}
+
+.full-line {
+  grid-column: 1 / -1;
 }
 
 .inline-booking-form {
@@ -663,6 +655,36 @@ button {
   border-radius: 14px;
   padding: 14px 16px;
   background: rgba(255, 255, 255, 0.94);
+}
+
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: grid;
+  place-items: center;
+  padding: 28px;
+  background: rgba(14, 30, 24, 0.34);
+  backdrop-filter: blur(6px);
+}
+
+.modal-card {
+  width: min(720px, 100%);
+  max-height: calc(100vh - 56px);
+  overflow: auto;
+  border-radius: 28px;
+  border: 1px solid rgba(255, 255, 255, 0.78);
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: 0 24px 60px rgba(10, 30, 24, 0.18);
+  padding: 24px;
+}
+
+.modal-selection {
+  margin-top: 8px;
+  padding: 14px 16px;
+  border-radius: 18px;
+  border: 1px solid var(--line);
+  background: rgba(247, 251, 249, 0.92);
 }
 
 .channel-card {

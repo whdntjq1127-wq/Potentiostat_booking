@@ -109,6 +109,10 @@ export function WeeklySchedule({
                         return false;
                       }
 
+                      if (booking.channel !== channel) {
+                        return false;
+                      }
+
                       return overlaps(
                         slotStart,
                         slotEnd,
@@ -117,8 +121,7 @@ export function WeeklySchedule({
                       );
                     });
 
-                    const visibleBooking =
-                      activeBooking?.channel === channel ? activeBooking : null;
+                    const visibleBooking = activeBooking ?? null;
                     const inBlockedDate = blockedDates.includes(slotDateKey);
                     const inWindow = isStartWithinBookingWindow(
                       slotStart,
@@ -137,7 +140,7 @@ export function WeeklySchedule({
                     if (visibleBooking) {
                       className += ' booked';
                     } else if (!selectable) {
-                      className += activeBooking ? ' occupied-other' : ' unavailable';
+                      className += ' unavailable';
                     } else {
                       className += ' available';
                     }
@@ -171,9 +174,7 @@ export function WeeklySchedule({
                           title={
                             visibleBooking
                               ? `${visibleBooking.applicant}님 예약`
-                              : activeBooking
-                                ? `${activeBooking.applicant}님이 같은 시간대에 장비를 사용 중입니다`
-                                : inBlockedDate
+                              : inBlockedDate
                                   ? '관리자에 의해 차단된 날짜입니다'
                                   : inWindow
                                     ? '지난 시간이거나 선택할 수 없는 슬롯입니다'

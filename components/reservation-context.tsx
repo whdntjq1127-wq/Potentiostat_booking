@@ -84,12 +84,17 @@ function isActive(booking: Booking) {
 
 function getConflictBooking(
   bookings: Booking[],
+  channel: Channel,
   start: Date,
   end: Date,
   ignoreId?: string,
 ) {
   return bookings.find((booking) => {
-    if (!isActive(booking) || booking.id === ignoreId) {
+    if (
+      !isActive(booking) ||
+      booking.id === ignoreId ||
+      booking.channel !== channel
+    ) {
       return false;
     }
 
@@ -100,6 +105,24 @@ function getConflictBooking(
       new Date(booking.endAt),
     );
   });
+}
+
+function isHourAlignedRange(start: Date, end: Date) {
+  if (
+    start.getMinutes() !== 0 ||
+    start.getSeconds() !== 0 ||
+    start.getMilliseconds() !== 0 ||
+    end.getMinutes() !== 0 ||
+    end.getSeconds() !== 0 ||
+    end.getMilliseconds() !== 0
+  ) {
+    return false;
+  }
+
+  const diff = end.getTime() - start.getTime();
+  const oneHour = 60 * 60 * 1000;
+
+  return diff >= oneHour && diff % oneHour === 0;
 }
 
 export function ReservationProvider({ children }: { children: ReactNode }) {
@@ -153,12 +176,11 @@ export function ReservationProvider({ children }: { children: ReactNode }) {
           return { ok: false, message: '종료 시각은 시작 시각보다 뒤여야 합니다.' };
         }
 
-        if (
-          start.getMinutes() !== 0 ||
-          start.getSeconds() !== 0 ||
-          end.getTime() !== addHours(start, 1).getTime()
-        ) {
-          return { ok: false, message: '예약은 정확히 1시간 단위로만 등록할 수 있습니다.' };
+        if (!isHourAlignedRange(start, end)) {
+          return {
+            ok: false,
+            message: '예약은 1시간 단위로만 등록할 수 있습니다. 예: 13시~18시 가능, 13시~18시30분 불가',
+          };
         }
 
         if (!isStartWithinBookingWindow(start, snapshot.settings, new Date())) {
@@ -187,7 +209,12 @@ export function ReservationProvider({ children }: { children: ReactNode }) {
           };
         }
 
-        const conflict = getConflictBooking(snapshot.bookings, start, end);
+        const conflict = getConflictBooking(
+          snapshot.bookings,
+          channel,
+          start,
+          end,
+        );
 
         if (conflict) {
           return {
@@ -197,13 +224,12 @@ export function ReservationProvider({ children }: { children: ReactNode }) {
         }
 
         const createdAt = new Date();
-        const normalizedEndAt = toDateTimeLocal(addHours(start, 1));
         const newBooking: Booking = {
           id: `bk-${createdAt.getTime()}`,
           applicant: trimmedApplicant,
           channel,
           startAt,
-          endAt: normalizedEndAt,
+          endAt,
           purpose: trimmedPurpose,
           status: 'active',
           createdAt: createdAt.toISOString(),
@@ -237,12 +263,11 @@ export function ReservationProvider({ children }: { children: ReactNode }) {
           return { ok: false, message: '종료 시각은 시작 시각보다 뒤여야 합니다.' };
         }
 
-        if (
-          start.getMinutes() !== 0 ||
-          start.getSeconds() !== 0 ||
-          end.getTime() !== addHours(start, 1).getTime()
-        ) {
-          return { ok: false, message: '예약은 정확히 1시간 단위로만 수정할 수 있습니다.' };
+        if (!isHourAlignedRange(start, end)) {
+          return {
+            ok: false,
+            message: '예약은 1시간 단위로만 수정할 수 있습니다. 예: 13시~18시 가능, 13시~18시30분 불가',
+          };
         }
 
         if (!isStartWithinBookingWindow(start, snapshot.settings, new Date())) {
@@ -271,7 +296,13 @@ export function ReservationProvider({ children }: { children: ReactNode }) {
           };
         }
 
-        const conflict = getConflictBooking(snapshot.bookings, start, end, id);
+        const conflict = getConflictBooking(
+          snapshot.bookings,
+          channel,
+          start,
+          end,
+          id,
+        );
 
         if (conflict) {
           return {
@@ -289,7 +320,7 @@ export function ReservationProvider({ children }: { children: ReactNode }) {
                     ...booking,
                     channel,
                     startAt,
-                    endAt: toDateTimeLocal(addHours(start, 1)),
+                    endAt,
                     purpose: purpose.trim(),
                   }
                 : booking,

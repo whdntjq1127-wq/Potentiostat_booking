@@ -7,8 +7,11 @@ import { WeeklySchedule, type SelectedSlot } from '../components/weekly-schedule
 import {
   addDays,
   formatDateLabel,
+  formatDateTimeLabel,
   formatBookingRange,
   getLatestBookableDate,
+  toDateTimeLocal,
+  addHours,
 } from '../lib/reservation-data';
 
 export default function Home() {
@@ -19,6 +22,7 @@ export default function Home() {
   const [selectedSlot, setSelectedSlot] = useState<SelectedSlot | null>(null);
   const [applicant, setApplicant] = useState('');
   const [purpose, setPurpose] = useState('');
+  const [endAt, setEndAt] = useState('');
   const [message, setMessage] = useState<{
     ok: boolean;
     text: string;
@@ -30,6 +34,16 @@ export default function Home() {
     setWeekAnchor(current);
     setMounted(true);
   }, []);
+
+  useEffect(() => {
+    if (!selectedSlot) {
+      return;
+    }
+
+    setApplicant('');
+    setPurpose('');
+    setEndAt(selectedSlot.endAt);
+  }, [selectedSlot]);
 
   if (!ready || !mounted || !now || !weekAnchor) {
     return (
@@ -57,76 +71,11 @@ export default function Home() {
               <span>
                 시작 가능 마감일: {formatDateLabel(latestBookableDate)}
               </span>
-              <span>예약 시간: 1시간 고정</span>
+              <span>예약 시간: 1시간 단위</span>
               <span>
                 <Link href="/my-bookings">내 예약 조회</Link>
               </span>
             </div>
-          </div>
-
-          <div className="calendar-inline-booking">
-            {selectedSlot ? (
-              <>
-                <div className="selection-card">
-                  <strong>{selectedSlot.channel}</strong>
-                  <span>
-                    선택 슬롯: {formatBookingRange(selectedSlot.startAt, selectedSlot.endAt)}
-                  </span>
-                </div>
-
-                <form
-                  className="inline-booking-form"
-                  onSubmit={(event) => {
-                    event.preventDefault();
-
-                    const result = addBooking({
-                      applicant,
-                      channel: selectedSlot.channel,
-                      startAt: selectedSlot.startAt,
-                      endAt: selectedSlot.endAt,
-                      purpose,
-                    });
-
-                    setMessage({ ok: result.ok, text: result.message });
-
-                    if (result.ok) {
-                      setApplicant('');
-                      setPurpose('');
-                      setSelectedSlot(null);
-                    }
-                  }}
-                >
-                  <input
-                    type="text"
-                    value={applicant}
-                    onChange={(event) => setApplicant(event.target.value)}
-                    placeholder="사용자 이름"
-                    required
-                  />
-                  <input
-                    type="text"
-                    value={purpose}
-                    onChange={(event) => setPurpose(event.target.value)}
-                    placeholder="메모"
-                  />
-                  <button className="button" type="submit">
-                    예약 저장
-                  </button>
-                  <button
-                    className="button-ghost"
-                    type="button"
-                    onClick={() => setSelectedSlot(null)}
-                  >
-                    선택 취소
-                  </button>
-                </form>
-              </>
-            ) : (
-              <div className="selection-placeholder">
-                달력에서 비어 있는 칸을 클릭하면 바로 이 자리에서 예약을 등록할 수
-                있습니다.
-              </div>
-            )}
           </div>
 
           {message ? (
@@ -150,6 +99,122 @@ export default function Home() {
             }
           />
       </section>
+
+      {selectedSlot ? (
+        <div className="modal-overlay" onClick={() => setSelectedSlot(null)}>
+          <section
+            className="modal-card"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="section-head">
+              <div>
+                <div className="eyebrow">예약 등록</div>
+                <h2 className="section-title">선택한 칸으로 예약하기</h2>
+              </div>
+              <button
+                type="button"
+                className="button-ghost"
+                onClick={() => setSelectedSlot(null)}
+              >
+                닫기
+              </button>
+            </div>
+
+            <div className="selection-card modal-selection">
+              <strong>{selectedSlot.channel}</strong>
+              <span>시작: {formatDateTimeLabel(selectedSlot.startAt)}</span>
+              <span>종료: {formatDateTimeLabel(endAt || selectedSlot.endAt)}</span>
+            </div>
+
+            <form
+              className="form-grid section"
+              onSubmit={(event) => {
+                event.preventDefault();
+
+                const result = addBooking({
+                  applicant,
+                  channel: selectedSlot.channel,
+                  startAt: selectedSlot.startAt,
+                  endAt,
+                  purpose,
+                });
+
+                setMessage({ ok: result.ok, text: result.message });
+
+                if (result.ok) {
+                  setSelectedSlot(null);
+                  setApplicant('');
+                  setPurpose('');
+                  setEndAt('');
+                }
+              }}
+            >
+              <div className="field full">
+                <label htmlFor="modal-applicant">사용자 이름</label>
+                <input
+                  id="modal-applicant"
+                  type="text"
+                  value={applicant}
+                  onChange={(event) => setApplicant(event.target.value)}
+                  placeholder="예: 김연구"
+                  required
+                />
+              </div>
+
+              <div className="field">
+                <label htmlFor="modal-start">장비 사용 시작</label>
+                <input
+                  id="modal-start"
+                  type="datetime-local"
+                  value={selectedSlot.startAt}
+                  readOnly
+                />
+              </div>
+
+              <div className="field">
+                <label htmlFor="modal-end">장비 사용 종료</label>
+                <input
+                  id="modal-end"
+                  type="datetime-local"
+                  step={3600}
+                  min={toDateTimeLocal(addHours(new Date(selectedSlot.startAt), 1))}
+                  value={endAt}
+                  onChange={(event) => setEndAt(event.target.value)}
+                  required
+                />
+              </div>
+
+              <div className="field full">
+                <label htmlFor="modal-purpose">메모</label>
+                <textarea
+                  id="modal-purpose"
+                  value={purpose}
+                  onChange={(event) => setPurpose(event.target.value)}
+                  placeholder="실험 메모나 전달 내용을 적어 주세요."
+                />
+              </div>
+
+              <div className="inline-note full-line">
+                시작 시각은 클릭한 칸으로 고정됩니다. 종료 시각은 1시간 단위로만 설정할 수
+                있고, 시작 시각으로부터 최대 {settings.maxDurationDays}일까지 선택할 수 있습니다.
+              </div>
+
+              <div className="action-row">
+                <button className="button" type="submit">
+                  예약 저장
+                </button>
+                <button
+                  type="button"
+                  className="button-ghost"
+                  onClick={() => setSelectedSlot(null)}
+                >
+                  취소
+                </button>
+              </div>
+            </form>
+          </section>
+        </div>
+      ) : null}
     </main>
   );
 }
