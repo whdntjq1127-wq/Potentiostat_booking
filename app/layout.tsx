@@ -4,8 +4,8 @@ import { ReservationProvider } from '../components/reservation-context';
 import { SiteShell } from '../components/site-shell';
 
 export const metadata: Metadata = {
-  title: 'Potentiostat 예약 시스템',
-  description: '연구실 Potentiostat 장비 예약을 위한 데모 웹사이트',
+  title: 'Potentiostat 예약 보드',
+  description: '이름만 입력해 CH 1, CH 2, CH 3 예약을 관리하는 Potentiostat 데모 사이트',
 };
 
 export default function RootLayout({

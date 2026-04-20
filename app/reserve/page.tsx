@@ -1,180 +1,91 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { BookingForm } from '../../components/booking-form';
 import { useReservation } from '../../components/reservation-context';
+import { formatDateLabel, getLatestBookableDate } from '../../lib/reservation-data';
 
 export default function ReservePage() {
-  const { addBooking, blockedDates, notices } = useReservation();
-  const [form, setForm] = useState({
-    date: '2026-04-27',
-    startTime: '10:00',
-    endTime: '12:00',
-    purpose: '전해질 조성 변화에 따른 impedance 분석',
-  });
-  const [submitted, setSubmitted] = useState(false);
+  const { ready, blockedDates, notices, settings } = useReservation();
+  const [mounted, setMounted] = useState(false);
+  const [now, setNow] = useState<Date | null>(null);
+
+  useEffect(() => {
+    setNow(new Date());
+    setMounted(true);
+  }, []);
+
+  if (!ready || !mounted || !now) {
+    return (
+      <main>
+        <section className="panel">
+          <div className="eyebrow">불러오는 중</div>
+          <h1 className="section-title">예약 입력 화면을 준비하고 있습니다.</h1>
+        </section>
+      </main>
+    );
+  }
 
   return (
-    <main className="grid-2">
-      <section className="panel">
-        <div className="eyebrow">예약 신청</div>
-        <h1 className="section-title">장비 사용 일정을 등록하세요</h1>
-        <p className="muted">
-          실제 로그인 없이 데모 데이터로 작동합니다. 신청 즉시 내 예약 목록에
-          추가되며, 기본 상태는 승인 대기입니다.
-        </p>
+    <main className="dashboard-grid">
+      <BookingForm
+        title="예약 직접 등록"
+        description="달력을 누르지 않고도 시작 시각과 종료 시각을 직접 입력할 수 있습니다."
+      />
 
-        <form
-          className="form-grid"
-          onSubmit={(event) => {
-            event.preventDefault();
-            addBooking(form);
-            setSubmitted(true);
-          }}
-        >
-          <div className="field">
-            <label htmlFor="date">예약 날짜</label>
-            <input
-              id="date"
-              type="date"
-              value={form.date}
-              onChange={(event) =>
-                setForm((current) => ({ ...current, date: event.target.value }))
-              }
-            />
-          </div>
-
-          <div className="field">
-            <label htmlFor="purpose-type">실험 유형</label>
-            <select
-              id="purpose-type"
-              onChange={(event) =>
-                setForm((current) => ({
-                  ...current,
-                  purpose:
-                    event.target.value === 'custom'
-                      ? current.purpose
-                      : event.target.value,
-                }))
-              }
-              defaultValue="전해질 조성 변화에 따른 impedance 분석"
-            >
-              <option>전해질 조성 변화에 따른 impedance 분석</option>
-              <option>전극 샘플의 cyclic voltammetry 측정</option>
-              <option>장시간 galvanostatic stability 테스트</option>
-              <option value="custom">직접 입력</option>
-            </select>
-          </div>
-
-          <div className="field">
-            <label htmlFor="startTime">시작 시간</label>
-            <input
-              id="startTime"
-              type="time"
-              value={form.startTime}
-              onChange={(event) =>
-                setForm((current) => ({
-                  ...current,
-                  startTime: event.target.value,
-                }))
-              }
-            />
-          </div>
-
-          <div className="field">
-            <label htmlFor="endTime">종료 시간</label>
-            <input
-              id="endTime"
-              type="time"
-              value={form.endTime}
-              onChange={(event) =>
-                setForm((current) => ({
-                  ...current,
-                  endTime: event.target.value,
-                }))
-              }
-            />
-          </div>
-
-          <div className="field full">
-            <label htmlFor="purpose">사용 목적</label>
-            <textarea
-              id="purpose"
-              value={form.purpose}
-              onChange={(event) =>
-                setForm((current) => ({ ...current, purpose: event.target.value }))
-              }
-            />
-          </div>
-
-          <div className="action-row">
-            <button className="button" type="submit">
-              예약 신청 등록
-            </button>
-            <button
-              className="button-ghost"
-              type="button"
-              onClick={() =>
-                setForm({
-                  date: '2026-04-27',
-                  startTime: '10:00',
-                  endTime: '12:00',
-                  purpose: '전해질 조성 변화에 따른 impedance 분석',
-                })
-              }
-            >
-              예시값으로 되돌리기
-            </button>
-          </div>
-        </form>
-
-        {submitted ? (
-          <div className="note-box" style={{ marginTop: 18 }}>
-            <strong>예약 신청이 추가되었습니다.</strong>
-            <p className="muted">
-              내 예약 페이지에서 방금 등록한 신청 건과 상태를 확인할 수 있습니다.
-            </p>
-          </div>
-        ) : null}
-      </section>
-
-      <section className="panel">
-        <div className="eyebrow">운영 참고</div>
-        <h2 className="section-title">예약 전 확인 사항</h2>
-
-        <div className="info-list">
-          <div className="info-item">
-            <div className="info-badge">1</div>
-            <div>
-              <strong>점검일 차단 일정</strong>
-              <p className="muted">
-                {blockedDates.length > 0
-                  ? blockedDates.join(', ')
-                  : '현재 등록된 차단 일정이 없습니다.'}
-              </p>
+      <section className="side-column">
+        <article className="panel">
+          <div className="eyebrow">예약 체크</div>
+          <h2 className="section-title">입력 전 확인</h2>
+          <div className="info-list">
+            <div className="info-item">
+              <div className="info-badge">A</div>
+              <div>
+                <strong>사용자 이름 필수</strong>
+                <p className="muted">로그인 없이 예약하므로 이름이 유일한 식별자입니다.</p>
+              </div>
+            </div>
+            <div className="info-item">
+              <div className="info-badge">B</div>
+              <div>
+                <strong>시작 가능 마감일</strong>
+                <p className="muted">
+                  현재는 {formatDateLabel(getLatestBookableDate(settings, now))}까지
+                  시작하는 예약만 등록할 수 있습니다.
+                </p>
+              </div>
+            </div>
+            <div className="info-item">
+              <div className="info-badge">C</div>
+              <div>
+                <strong>최대 사용 기간</strong>
+                <p className="muted">
+                  한 번의 예약은 최대 {settings.maxDurationDays}일까지만 유지됩니다.
+                </p>
+              </div>
             </div>
           </div>
+        </article>
 
-          <div className="info-item">
-            <div className="info-badge">2</div>
-            <div>
-              <strong>실험 준비</strong>
-              <p className="muted">
-                샘플, 전해질, 전극 상태를 미리 점검하고 필요한 소모품을 준비해
-                주세요.
-              </p>
-            </div>
+        <article className="panel">
+          <div className="eyebrow">차단 일정</div>
+          <h2 className="section-title">예약 불가 날짜</h2>
+          <div className="chip-row">
+            {blockedDates.length === 0 ? (
+              <span className="chip">차단된 날짜 없음</span>
+            ) : (
+              blockedDates.map((date) => (
+                <span key={date} className="chip">
+                  {date}
+                </span>
+              ))
+            )}
           </div>
-        </div>
+        </article>
 
-        <div className="section">
-          <div className="section-head">
-            <div>
-              <div className="eyebrow">공지</div>
-              <h3 className="section-title" style={{ fontSize: '1.5rem' }}>
-                최근 안내
-              </h3>
-            </div>
-          </div>
+        <article className="panel">
+          <div className="eyebrow">공지</div>
+          <h2 className="section-title">운용 메모</h2>
           <div className="notice-list">
             {notices.map((notice) => (
               <div key={notice} className="announcement">
@@ -182,7 +93,7 @@ export default function ReservePage() {
               </div>
             ))}
           </div>
-        </div>
+        </article>
       </section>
     </main>
   );
