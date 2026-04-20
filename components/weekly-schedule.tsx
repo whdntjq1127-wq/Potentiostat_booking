@@ -7,6 +7,7 @@ import {
   addHours,
   formatShortDateLabel,
   getChannelColor,
+  getChannelSoftColor,
   getWeekDates,
   isStartWithinBookingWindow,
   overlaps,
@@ -85,7 +86,7 @@ export function WeeklySchedule({
                   {(() => {
                     const channelStyle = {
                       '--channel-color': getChannelColor(channel),
-                      '--channel-color-soft': `${getChannelColor(channel)}66`,
+                      '--channel-color-soft': getChannelSoftColor(channel),
                     } as CSSProperties;
 
                     return (
@@ -132,9 +133,7 @@ export function WeeklySchedule({
                       settings,
                       now,
                     );
-                    const inPast = slotStart < now;
-                    const selectable =
-                      !activeBooking && !inBlockedDate && inWindow && !inPast;
+                    const selectable = !activeBooking && !inBlockedDate && inWindow;
                     const isSelected =
                       !!selectedSlot &&
                       selectedSlot.channel === channel &&
@@ -179,8 +178,8 @@ export function WeeklySchedule({
                               : inBlockedDate
                                   ? '관리자에 의해 차단된 날짜입니다'
                                   : inWindow
-                                    ? '지난 시간이거나 선택할 수 없는 슬롯입니다'
-                              : '예약 가능 범위를 벗어난 시작 시각입니다'
+                                    ? '선택할 수 없는 슬롯입니다'
+                                    : '예약 가능 범위를 벗어난 시작 날짜입니다'
                           }
                         >
                           {visibleBooking ? visibleBooking.applicant : selectable ? '' : '/'}

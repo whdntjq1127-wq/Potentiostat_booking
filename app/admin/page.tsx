@@ -304,7 +304,12 @@ export default function AdminPage() {
                   <button
                     type="button"
                     className="button-warning"
-                    onClick={() => cancelBooking(booking.id)}
+                    onClick={() =>
+                      cancelBooking({
+                        id: booking.id,
+                        requestedBy: '관리자',
+                      })
+                    }
                   >
                     관리자 취소
                   </button>

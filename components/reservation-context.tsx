@@ -9,17 +9,18 @@ import {
   type ReactNode,
 } from 'react';
 import {
+  buildBookingSummary,
   compareBookings,
+  compareChangeLogs,
   createInitialReservationState,
   fromDateTimeLocal,
-  addHours,
   getCoveredDateKeys,
   getLatestAllowedEnd,
   isStartWithinBookingWindow,
   overlaps,
-  toDateTimeLocal,
   type Booking,
   type Channel,
+  type ChangeLogEntry,
   type ReservationSettings,
   type ReservationSnapshot,
 } from '../lib/reservation-data';
@@ -37,6 +38,7 @@ type ReservationContextValue = {
   blockedDates: string[];
   notices: string[];
   settings: ReservationSettings;
+  changeLogs: ChangeLogEntry[];
   addBooking: (input: {
     applicant: string;
     channel: Channel;
@@ -46,12 +48,13 @@ type ReservationContextValue = {
   }) => ActionResult;
   updateBooking: (input: {
     id: string;
+    requestedBy: string;
     channel: Channel;
     startAt: string;
     endAt: string;
     purpose: string;
   }) => ActionResult;
-  cancelBooking: (id: string) => void;
+  cancelBooking: (input: { id: string; requestedBy: string }) => void;
   addBlockedDate: (date: string) => ActionResult;
   removeBlockedDate: (date: string) => void;
   addNotice: (notice: string) => ActionResult;
@@ -125,6 +128,22 @@ function isHourAlignedRange(start: Date, end: Date) {
   return diff >= oneHour && diff % oneHour === 0;
 }
 
+function createLogEntry(
+  action: ChangeLogEntry['action'],
+  actor: string,
+  summary: string,
+): ChangeLogEntry {
+  const now = new Date();
+
+  return {
+    id: `log-${now.getTime()}-${Math.random().toString(36).slice(2, 8)}`,
+    actor: actor.trim() || '알 수 없음',
+    action,
+    summary,
+    createdAt: now.toISOString(),
+  };
+}
+
 export function ReservationProvider({ children }: { children: ReactNode }) {
   const [snapshot, setSnapshot] = useState<ReservationSnapshot>(() =>
     createInitialReservationState(),
@@ -134,9 +153,15 @@ export function ReservationProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const stored = parseStoredState();
     if (stored) {
+      const defaults = createInitialReservationState();
       setSnapshot({
+        ...defaults,
         ...stored,
         bookings: [...stored.bookings].sort(compareBookings),
+        blockedDates: stored.blockedDates ?? defaults.blockedDates,
+        notices: stored.notices ?? defaults.notices,
+        settings: stored.settings ?? defaults.settings,
+        changeLogs: [...(stored.changeLogs ?? [])].sort(compareChangeLogs),
       });
     }
     setReady(true);
@@ -157,6 +182,7 @@ export function ReservationProvider({ children }: { children: ReactNode }) {
       blockedDates: snapshot.blockedDates,
       notices: snapshot.notices,
       settings: snapshot.settings,
+      changeLogs: snapshot.changeLogs,
       addBooking: ({ applicant, channel, startAt, endAt, purpose }) => {
         const trimmedApplicant = applicant.trim();
         const trimmedPurpose = purpose.trim();
@@ -238,6 +264,19 @@ export function ReservationProvider({ children }: { children: ReactNode }) {
         setSnapshot((current) => ({
           ...current,
           bookings: [...current.bookings, newBooking].sort(compareBookings),
+          changeLogs: [
+            createLogEntry(
+              'booking_created',
+              trimmedApplicant,
+              buildBookingSummary({
+                channel,
+                startAt,
+                endAt,
+                purpose: trimmedPurpose,
+              }),
+            ),
+            ...current.changeLogs,
+          ].sort(compareChangeLogs),
         }));
 
         return {
@@ -245,7 +284,7 @@ export function ReservationProvider({ children }: { children: ReactNode }) {
           message: `${trimmedApplicant}님의 예약이 등록되었습니다.`,
         };
       },
-      updateBooking: ({ id, channel, startAt, endAt, purpose }) => {
+      updateBooking: ({ id, requestedBy, channel, startAt, endAt, purpose }) => {
         const target = snapshot.bookings.find((booking) => booking.id === id);
 
         if (!target) {
@@ -326,6 +365,24 @@ export function ReservationProvider({ children }: { children: ReactNode }) {
                 : booking,
             )
             .sort(compareBookings),
+          changeLogs: [
+            createLogEntry(
+              'booking_updated',
+              requestedBy,
+              `${target.applicant} 예약 변경: ${buildBookingSummary({
+                channel: target.channel,
+                startAt: target.startAt,
+                endAt: target.endAt,
+                purpose: target.purpose,
+              })} -> ${buildBookingSummary({
+                channel,
+                startAt,
+                endAt,
+                purpose,
+              })}`,
+            ),
+            ...current.changeLogs,
+          ].sort(compareChangeLogs),
         }));
 
         return {
@@ -333,12 +390,31 @@ export function ReservationProvider({ children }: { children: ReactNode }) {
           message: `${target.applicant}님의 예약을 수정했습니다.`,
         };
       },
-      cancelBooking: (id) => {
+      cancelBooking: ({ id, requestedBy }) => {
+        const target = snapshot.bookings.find((booking) => booking.id === id);
+
+        if (!target) {
+          return;
+        }
+
         setSnapshot((current) => ({
           ...current,
           bookings: current.bookings.map((booking) =>
             booking.id === id ? { ...booking, status: 'cancelled' } : booking,
           ),
+          changeLogs: [
+            createLogEntry(
+              'booking_cancelled',
+              requestedBy,
+              `${target.applicant} 예약 취소: ${buildBookingSummary({
+                channel: target.channel,
+                startAt: target.startAt,
+                endAt: target.endAt,
+                purpose: target.purpose,
+              })}`,
+            ),
+            ...current.changeLogs,
+          ].sort(compareChangeLogs),
         }));
       },
       addBlockedDate: (date) => {
@@ -354,6 +430,10 @@ export function ReservationProvider({ children }: { children: ReactNode }) {
         setSnapshot((current) => ({
           ...current,
           blockedDates: [...current.blockedDates, trimmed].sort(),
+          changeLogs: [
+            createLogEntry('blocked_date_added', '관리자', `${trimmed} 예약 차단`),
+            ...current.changeLogs,
+          ].sort(compareChangeLogs),
         }));
 
         return { ok: true, message: `${trimmed}을 차단했습니다.` };
@@ -364,6 +444,10 @@ export function ReservationProvider({ children }: { children: ReactNode }) {
           blockedDates: current.blockedDates.filter(
             (blockedDate) => blockedDate !== date,
           ),
+          changeLogs: [
+            createLogEntry('blocked_date_removed', '관리자', `${date} 차단 해제`),
+            ...current.changeLogs,
+          ].sort(compareChangeLogs),
         }));
       },
       addNotice: (notice) => {
@@ -375,6 +459,10 @@ export function ReservationProvider({ children }: { children: ReactNode }) {
         setSnapshot((current) => ({
           ...current,
           notices: [trimmed, ...current.notices],
+          changeLogs: [
+            createLogEntry('notice_added', '관리자', `공지 추가: ${trimmed}`),
+            ...current.changeLogs,
+          ].sort(compareChangeLogs),
         }));
 
         return { ok: true, message: '공지사항을 추가했습니다.' };
@@ -383,6 +471,10 @@ export function ReservationProvider({ children }: { children: ReactNode }) {
         setSnapshot((current) => ({
           ...current,
           notices: current.notices.filter((item) => item !== notice),
+          changeLogs: [
+            createLogEntry('notice_removed', '관리자', `공지 삭제: ${notice}`),
+            ...current.changeLogs,
+          ].sort(compareChangeLogs),
         }));
       },
       updateSettings: (next) => {
@@ -407,6 +499,14 @@ export function ReservationProvider({ children }: { children: ReactNode }) {
             bookingWindowDays: Math.floor(next.bookingWindowDays),
             maxDurationDays: Math.floor(next.maxDurationDays),
           },
+          changeLogs: [
+            createLogEntry(
+              'settings_updated',
+              '관리자',
+              `예약 시작 가능 범위 ${Math.floor(next.bookingWindowDays)}일, 최대 사용 기간 ${Math.floor(next.maxDurationDays)}일로 변경`,
+            ),
+            ...current.changeLogs,
+          ].sort(compareChangeLogs),
         }));
 
         return { ok: true, message: '예약 규칙을 저장했습니다.' };

@@ -70,6 +70,9 @@ export default function MyBookingsPage() {
           로그인 대신 이름으로 예약을 찾습니다. 예약을 등록할 때 사용한 이름과 정확히
           같아야 합니다.
         </p>
+        <p className="muted">
+          예약 생성, 수정, 취소는 모두 메인 화면의 공개 로그북에 기록됩니다.
+        </p>
 
         <div className="lookup-bar section">
           <input
@@ -134,7 +137,12 @@ export default function MyBookingsPage() {
                     <button
                       type="button"
                       className="button-danger"
-                      onClick={() => cancelBooking(booking.id)}
+                      onClick={() =>
+                        cancelBooking({
+                          id: booking.id,
+                          requestedBy: query.trim() || booking.applicant,
+                        })
+                      }
                     >
                       예약 취소
                     </button>
@@ -148,6 +156,7 @@ export default function MyBookingsPage() {
                       event.preventDefault();
                       const result = updateBooking({
                         id: booking.id,
+                        requestedBy: query.trim() || booking.applicant,
                         channel: editDraft.channel,
                         startAt: editDraft.startAt,
                         endAt: editDraft.endAt,

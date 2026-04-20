@@ -3,12 +3,22 @@ export const CHANNELS = ['CH 1', 'CH 2', 'CH 3'] as const;
 export type Channel = (typeof CHANNELS)[number];
 
 export const CHANNEL_COLORS: Record<Channel, string> = {
-  'CH 1': '#FDE724',
-  'CH 2': '#BADE27',
-  'CH 3': '#44BE70',
+  'CH 1': '#8B919A',
+  'CH 2': '#A8AEB6',
+  'CH 3': '#C8CDD3',
 };
 
 export type BookingStatus = 'active' | 'cancelled';
+
+export type ChangeAction =
+  | 'booking_created'
+  | 'booking_updated'
+  | 'booking_cancelled'
+  | 'blocked_date_added'
+  | 'blocked_date_removed'
+  | 'notice_added'
+  | 'notice_removed'
+  | 'settings_updated';
 
 export type Booking = {
   id: string;
@@ -18,6 +28,14 @@ export type Booking = {
   endAt: string;
   purpose: string;
   status: BookingStatus;
+  createdAt: string;
+};
+
+export type ChangeLogEntry = {
+  id: string;
+  actor: string;
+  action: ChangeAction;
+  summary: string;
   createdAt: string;
 };
 
@@ -31,6 +49,7 @@ export type ReservationSnapshot = {
   blockedDates: string[];
   notices: string[];
   settings: ReservationSettings;
+  changeLogs: ChangeLogEntry[];
 };
 
 export const DEFAULT_SETTINGS: ReservationSettings = {
@@ -170,6 +189,16 @@ export function getChannelColor(channel: Channel) {
   return CHANNEL_COLORS[channel];
 }
 
+export function getChannelSoftColor(channel: Channel) {
+  const softMap: Record<Channel, string> = {
+    'CH 1': '#E3E5E8',
+    'CH 2': '#ECEDEF',
+    'CH 3': '#F4F5F6',
+  };
+
+  return softMap[channel];
+}
+
 export function overlaps(
   startA: Date,
   endA: Date,
@@ -196,17 +225,18 @@ export function isStartWithinBookingWindow(
   settings: ReservationSettings,
   now = new Date(),
 ) {
-  const first = ceilToHour(now);
-  const latest = addHours(first, settings.bookingWindowDays * 24);
+  const first = startOfDay(now);
+  const latest = addDays(first, settings.bookingWindowDays);
+  const startDate = startOfDay(start);
 
-  return start >= first && start <= latest;
+  return startDate >= first && startDate <= latest;
 }
 
 export function getLatestBookableDate(
   settings: ReservationSettings,
   now = new Date(),
 ) {
-  return addHours(ceilToHour(now), settings.bookingWindowDays * 24);
+  return addDays(startOfDay(now), settings.bookingWindowDays);
 }
 
 export function getLatestAllowedEnd(
@@ -220,8 +250,48 @@ export function compareBookings(a: Booking, b: Booking) {
   return a.startAt.localeCompare(b.startAt);
 }
 
+export function compareChangeLogs(a: ChangeLogEntry, b: ChangeLogEntry) {
+  return b.createdAt.localeCompare(a.createdAt);
+}
+
 export function getStatusLabel(status: BookingStatus) {
   return status === 'cancelled' ? '취소됨' : '예약 완료';
+}
+
+export function getChangeActionLabel(action: ChangeAction) {
+  switch (action) {
+    case 'booking_created':
+      return '예약 등록';
+    case 'booking_updated':
+      return '예약 수정';
+    case 'booking_cancelled':
+      return '예약 취소';
+    case 'blocked_date_added':
+      return '차단일 추가';
+    case 'blocked_date_removed':
+      return '차단일 해제';
+    case 'notice_added':
+      return '공지 추가';
+    case 'notice_removed':
+      return '공지 삭제';
+    case 'settings_updated':
+      return '규칙 변경';
+    default:
+      return '변경';
+  }
+}
+
+export function buildBookingSummary(booking: {
+  channel: Channel;
+  startAt: string;
+  endAt: string;
+  purpose?: string;
+}) {
+  const purposeText = booking.purpose?.trim()
+    ? ` · ${booking.purpose.trim()}`
+    : '';
+
+  return `${booking.channel} · ${formatBookingRange(booking.startAt, booking.endAt)}${purposeText}`;
 }
 
 export function createInitialReservationState(
@@ -259,7 +329,33 @@ export function createInitialReservationState(
     notices: [
       '이 사이트는 로그인 없이 이름만 입력해 예약하는 데모 버전입니다.',
       '각 채널은 독립적으로 예약되며, 같은 채널 안에서만 시간 중복이 제한됩니다.',
-      '관리자 페이지에서 시작 가능 범위와 최대 사용 기간을 바로 수정할 수 있습니다.',
+      '예약 생성, 수정, 취소는 모두 공개 로그북에 기록됩니다.',
+    ],
+    changeLogs: [
+      {
+        id: 'log-001',
+        actor: '김연구',
+        action: 'booking_created',
+        summary: buildBookingSummary({
+          channel: 'CH 1',
+          startAt: toDateTimeLocal(firstBookingStart),
+          endAt: toDateTimeLocal(addHours(firstBookingStart, 1)),
+          purpose: '전극 안정성 측정',
+        }),
+        createdAt: addHours(base, 9).toISOString(),
+      },
+      {
+        id: 'log-002',
+        actor: '박실험',
+        action: 'booking_created',
+        summary: buildBookingSummary({
+          channel: 'CH 2',
+          startAt: toDateTimeLocal(secondBookingStart),
+          endAt: toDateTimeLocal(addHours(secondBookingStart, 1)),
+          purpose: '임피던스 비교 실험',
+        }),
+        createdAt: addHours(base, 11).toISOString(),
+      },
     ],
     bookings: bookings.sort(compareBookings),
   };

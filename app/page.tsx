@@ -9,6 +9,7 @@ import {
   formatDateLabel,
   formatDateTimeLabel,
   formatDisplayTime,
+  getChangeActionLabel,
   getLatestBookableDate,
   addHours,
   formatShortDateLabel,
@@ -26,7 +27,8 @@ type EndOption = {
 };
 
 export default function Home() {
-  const { ready, addBooking, bookings, blockedDates, settings } = useReservation();
+  const { ready, addBooking, bookings, blockedDates, changeLogs, settings } =
+    useReservation();
   const [mounted, setMounted] = useState(false);
   const [now, setNow] = useState<Date | null>(null);
   const [weekAnchor, setWeekAnchor] = useState<Date | null>(null);
@@ -141,6 +143,7 @@ export default function Home() {
   const endTimeOptions = availableEndOptions.filter(
     (option) => option.dateKey === selectedEndDate,
   );
+  const recentLogs = changeLogs.slice(0, 12);
 
   return (
     <main className="calendar-page">
@@ -182,6 +185,35 @@ export default function Home() {
               )
             }
           />
+      </section>
+
+      <section className="panel">
+        <div className="section-head">
+          <div>
+            <div className="eyebrow">공개 로그북</div>
+            <h2 className="section-title">예약 변경 기록</h2>
+          </div>
+          <div className="muted">예약 생성, 수정, 취소와 관리자 변경이 모두 남습니다.</div>
+        </div>
+
+        <div className="logbook-list section">
+          {recentLogs.length === 0 ? (
+            <div className="empty-state">아직 기록된 변경 사항이 없습니다.</div>
+          ) : (
+            recentLogs.map((entry) => (
+              <article key={entry.id} className="log-entry">
+                <div className="card-head">
+                  <div className="log-meta">
+                    <span className="log-actor">{entry.actor}</span>
+                    <span className="muted">{formatDateTimeLabel(entry.createdAt)}</span>
+                  </div>
+                  <span className="chip">{getChangeActionLabel(entry.action)}</span>
+                </div>
+                <div>{entry.summary}</div>
+              </article>
+            ))
+          )}
+        </div>
       </section>
 
       {selectedSlot ? (
