@@ -144,7 +144,7 @@ function createLogEntry(
 
   return {
     id: `log-${now.getTime()}-${Math.random().toString(36).slice(2, 8)}`,
-    actor: actor.trim() || '알 수 없음',
+    actor: actor.trim() || 'Unknown',
     action,
     summary,
     createdAt: now.toISOString(),
@@ -228,24 +228,25 @@ export function ReservationProvider({ children }: { children: ReactNode }) {
         const trimmedPurpose = purpose.trim();
 
         if (!trimmedApplicant) {
-          return { ok: false, message: '사용자 이름은 반드시 입력해야 합니다.' };
+          return { ok: false, message: 'User name is required.' };
         }
 
         const start = fromDateTimeLocal(startAt);
         const end = fromDateTimeLocal(endAt);
 
         if (!start || !end) {
-          return { ok: false, message: '시작 시각과 종료 시각을 올바르게 입력해 주세요.' };
+          return { ok: false, message: 'Enter a valid start and end time.' };
         }
 
         if (end <= start) {
-          return { ok: false, message: '종료 시각은 시작 시각보다 뒤여야 합니다.' };
+          return { ok: false, message: 'End time must be after start time.' };
         }
 
         if (!isHourAlignedRange(start, end)) {
           return {
             ok: false,
-            message: '예약은 1시간 단위로만 등록할 수 있습니다. 예: 13시~18시 가능, 13시~18시30분 불가',
+            message:
+              'Bookings must use 1-hour increments. Example: 13:00-18:00 is allowed, 13:00-18:30 is not.',
           };
         }
 
@@ -253,14 +254,14 @@ export function ReservationProvider({ children }: { children: ReactNode }) {
           return {
             ok: false,
             message:
-              '시작 날짜가 현재 예약 가능 범위를 벗어났습니다. 관리자 페이지에서 범위를 조정할 수 있습니다.',
+              'The start date is outside the current booking window. You can adjust it on the admin page.',
           };
         }
 
         if (end > getLatestAllowedEnd(start, snapshot.settings)) {
           return {
             ok: false,
-            message: `최대 사용 기간은 ${snapshot.settings.maxDurationDays}일입니다.`,
+            message: `Maximum usage duration is ${snapshot.settings.maxDurationDays} days.`,
           };
         }
 
@@ -271,7 +272,7 @@ export function ReservationProvider({ children }: { children: ReactNode }) {
         if (blockedDate) {
           return {
             ok: false,
-            message: `${blockedDate}은 관리자에 의해 예약이 막혀 있습니다.`,
+            message: `${blockedDate} is blocked by the admin.`,
           };
         }
 
@@ -285,7 +286,7 @@ export function ReservationProvider({ children }: { children: ReactNode }) {
         if (conflict) {
           return {
             ok: false,
-            message: `${conflict.applicant}님의 기존 예약과 시간이 겹칩니다.`,
+            message: `This overlaps with ${conflict.applicant}'s existing booking.`,
           };
         }
 
@@ -329,31 +330,32 @@ export function ReservationProvider({ children }: { children: ReactNode }) {
 
         return {
           ok: true,
-          message: `${trimmedApplicant}님의 예약이 등록되었습니다.`,
+          message: `${trimmedApplicant}'s booking has been saved.`,
         };
       },
       updateBooking: ({ id, requestedBy, channel, startAt, endAt, purpose }) => {
         const target = snapshot.bookings.find((booking) => booking.id === id);
 
         if (!target) {
-          return { ok: false, message: '수정할 예약을 찾을 수 없습니다.' };
+          return { ok: false, message: 'Could not find the booking to edit.' };
         }
 
         const start = fromDateTimeLocal(startAt);
         const end = fromDateTimeLocal(endAt);
 
         if (!start || !end) {
-          return { ok: false, message: '시작 시각과 종료 시각을 올바르게 입력해 주세요.' };
+          return { ok: false, message: 'Enter a valid start and end time.' };
         }
 
         if (end <= start) {
-          return { ok: false, message: '종료 시각은 시작 시각보다 뒤여야 합니다.' };
+          return { ok: false, message: 'End time must be after start time.' };
         }
 
         if (!isHourAlignedRange(start, end)) {
           return {
             ok: false,
-            message: '예약은 1시간 단위로만 수정할 수 있습니다. 예: 13시~18시 가능, 13시~18시30분 불가',
+            message:
+              'Bookings can only be edited in 1-hour increments. Example: 13:00-18:00 is allowed, 13:00-18:30 is not.',
           };
         }
 
@@ -361,14 +363,14 @@ export function ReservationProvider({ children }: { children: ReactNode }) {
           return {
             ok: false,
             message:
-              '시작 날짜가 현재 예약 가능 범위를 벗어났습니다. 관리자 페이지에서 범위를 조정할 수 있습니다.',
+              'The start date is outside the current booking window. You can adjust it on the admin page.',
           };
         }
 
         if (end > getLatestAllowedEnd(start, snapshot.settings)) {
           return {
             ok: false,
-            message: `최대 사용 기간은 ${snapshot.settings.maxDurationDays}일입니다.`,
+            message: `Maximum usage duration is ${snapshot.settings.maxDurationDays} days.`,
           };
         }
 
@@ -379,7 +381,7 @@ export function ReservationProvider({ children }: { children: ReactNode }) {
         if (blockedDate) {
           return {
             ok: false,
-            message: `${blockedDate}은 관리자에 의해 예약이 막혀 있습니다.`,
+            message: `${blockedDate} is blocked by the admin.`,
           };
         }
 
@@ -394,7 +396,7 @@ export function ReservationProvider({ children }: { children: ReactNode }) {
         if (conflict) {
           return {
             ok: false,
-            message: `${conflict.applicant}님의 기존 예약과 시간이 겹칩니다.`,
+            message: `This overlaps with ${conflict.applicant}'s existing booking.`,
           };
         }
 
@@ -420,7 +422,7 @@ export function ReservationProvider({ children }: { children: ReactNode }) {
               createLogEntry(
                 'booking_updated',
                 requestedBy,
-                `${target.applicant} 예약 변경: ${buildBookingSummary({
+                `${target.applicant} booking changed: ${buildBookingSummary({
                   channel: target.channel,
                   startAt: target.startAt,
                   endAt: target.endAt,
@@ -443,7 +445,7 @@ export function ReservationProvider({ children }: { children: ReactNode }) {
 
         return {
           ok: true,
-          message: `${target.applicant}님의 예약을 수정했습니다.`,
+          message: `${target.applicant}'s booking has been updated.`,
         };
       },
       cancelBooking: ({ id, requestedBy }) => {
@@ -465,7 +467,7 @@ export function ReservationProvider({ children }: { children: ReactNode }) {
               createLogEntry(
                 'booking_cancelled',
                 requestedBy,
-                `${target.applicant} 예약 취소: ${buildBookingSummary({
+                `${target.applicant} booking cancelled: ${buildBookingSummary({
                   channel: target.channel,
                   startAt: target.startAt,
                   endAt: target.endAt,
@@ -484,11 +486,11 @@ export function ReservationProvider({ children }: { children: ReactNode }) {
       addBlockedDate: (date) => {
         const trimmed = date.trim();
         if (!trimmed) {
-          return { ok: false, message: '차단할 날짜를 선택해 주세요.' };
+          return { ok: false, message: 'Select a date to block.' };
         }
 
         if (snapshot.blockedDates.includes(trimmed)) {
-          return { ok: false, message: '이미 차단된 날짜입니다.' };
+          return { ok: false, message: 'This date is already blocked.' };
         }
 
         setSnapshot((current) => {
@@ -498,13 +500,13 @@ export function ReservationProvider({ children }: { children: ReactNode }) {
             ...base,
             blockedDates: [...base.blockedDates, trimmed].sort(),
             changeLogs: [
-              createLogEntry('blocked_date_added', '관리자', `${trimmed} 예약 차단`),
+              createLogEntry('blocked_date_added', 'Admin', `${trimmed} blocked`),
               ...base.changeLogs,
             ].sort(compareChangeLogs),
           };
         });
 
-        return { ok: true, message: `${trimmed}을 차단했습니다.` };
+        return { ok: true, message: `${trimmed} has been blocked.` };
       },
       removeBlockedDate: (date) => {
         setSnapshot((current) => {
@@ -516,7 +518,7 @@ export function ReservationProvider({ children }: { children: ReactNode }) {
               (blockedDate) => blockedDate !== date,
             ),
             changeLogs: [
-              createLogEntry('blocked_date_removed', '관리자', `${date} 차단 해제`),
+              createLogEntry('blocked_date_removed', 'Admin', `${date} unblocked`),
               ...base.changeLogs,
             ].sort(compareChangeLogs),
           };
@@ -525,7 +527,7 @@ export function ReservationProvider({ children }: { children: ReactNode }) {
       addNotice: (notice) => {
         const trimmed = notice.trim();
         if (!trimmed) {
-          return { ok: false, message: '공지 내용을 입력해 주세요.' };
+          return { ok: false, message: 'Enter notice content.' };
         }
 
         setSnapshot((current) => {
@@ -535,13 +537,13 @@ export function ReservationProvider({ children }: { children: ReactNode }) {
             ...base,
             notices: [trimmed, ...base.notices],
             changeLogs: [
-              createLogEntry('notice_added', '관리자', `공지 추가: ${trimmed}`),
+              createLogEntry('notice_added', 'Admin', `Notice added: ${trimmed}`),
               ...base.changeLogs,
             ].sort(compareChangeLogs),
           };
         });
 
-        return { ok: true, message: '공지사항을 추가했습니다.' };
+        return { ok: true, message: 'Notice has been added.' };
       },
       removeNotice: (notice) => {
         setSnapshot((current) => {
@@ -551,7 +553,7 @@ export function ReservationProvider({ children }: { children: ReactNode }) {
             ...base,
             notices: base.notices.filter((item) => item !== notice),
             changeLogs: [
-              createLogEntry('notice_removed', '관리자', `공지 삭제: ${notice}`),
+              createLogEntry('notice_removed', 'Admin', `Notice removed: ${notice}`),
               ...base.changeLogs,
             ].sort(compareChangeLogs),
           };
@@ -562,15 +564,18 @@ export function ReservationProvider({ children }: { children: ReactNode }) {
           !Number.isFinite(next.bookingWindowDays) ||
           !Number.isFinite(next.maxDurationDays)
         ) {
-          return { ok: false, message: '숫자 형식의 값만 저장할 수 있습니다.' };
+          return { ok: false, message: 'Only numeric values can be saved.' };
         }
 
         if (next.bookingWindowDays < 0) {
-          return { ok: false, message: '예약 가능 범위는 0일 이상이어야 합니다.' };
+          return { ok: false, message: 'Booking window must be 0 days or more.' };
         }
 
         if (next.maxDurationDays <= 0) {
-          return { ok: false, message: '최대 사용 기간은 1일 이상이어야 합니다.' };
+          return {
+            ok: false,
+            message: 'Maximum usage duration must be at least 1 day.',
+          };
         }
 
         setSnapshot((current) => {
@@ -585,15 +590,19 @@ export function ReservationProvider({ children }: { children: ReactNode }) {
             changeLogs: [
               createLogEntry(
                 'settings_updated',
-                '관리자',
-                `예약 시작 가능 범위 ${Math.floor(next.bookingWindowDays)}일, 최대 사용 기간 ${Math.floor(next.maxDurationDays)}일로 변경`,
+                'Admin',
+                `Booking window changed to ${Math.floor(
+                  next.bookingWindowDays,
+                )} days and maximum usage duration changed to ${Math.floor(
+                  next.maxDurationDays,
+                )} days`,
               ),
               ...base.changeLogs,
             ].sort(compareChangeLogs),
           };
         });
 
-        return { ok: true, message: '예약 규칙을 저장했습니다.' };
+        return { ok: true, message: 'Booking rules have been saved.' };
       },
     }),
     [ready, snapshot],

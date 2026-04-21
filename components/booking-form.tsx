@@ -65,7 +65,7 @@ export function BookingForm({
 
   return (
     <section className="panel">
-      <div className="eyebrow">예약 입력</div>
+      <div className="eyebrow">Booking Form</div>
       <h2 className="section-title">{title}</h2>
       <p className="muted">{description}</p>
 
@@ -93,7 +93,7 @@ export function BookingForm({
         }}
       >
         <div className="field full">
-          <label htmlFor="applicant">사용자 이름</label>
+          <label htmlFor="applicant">User Name</label>
           <input
             id="applicant"
             type="text"
@@ -104,13 +104,13 @@ export function BookingForm({
                 applicant: event.target.value,
               }))
             }
-            placeholder="예: 김연구"
+            placeholder="e.g. Dr. Kim"
             required
           />
         </div>
 
         <div className="field">
-          <label htmlFor="channel">채널</label>
+          <label htmlFor="channel">Channel</label>
           <select
             id="channel"
             value={draft.channel}
@@ -130,7 +130,7 @@ export function BookingForm({
         </div>
 
         <div className="field">
-          <label htmlFor="start-at">시작 시각</label>
+          <label htmlFor="start-at">Start Time</label>
           <input
             id="start-at"
             type="datetime-local"
@@ -147,7 +147,7 @@ export function BookingForm({
         </div>
 
         <div className="field">
-          <label htmlFor="end-at">종료 시각</label>
+          <label htmlFor="end-at">End Time</label>
           <input
             id="end-at"
             type="datetime-local"
@@ -164,7 +164,7 @@ export function BookingForm({
         </div>
 
         <div className="field full">
-          <label htmlFor="purpose">메모</label>
+          <label htmlFor="purpose">Memo</label>
           <textarea
             id="purpose"
             value={draft.purpose}
@@ -174,33 +174,34 @@ export function BookingForm({
                 purpose: event.target.value,
               }))
             }
-            placeholder="실험 목적이나 전달 메모를 적어 두면 좋습니다."
+            placeholder="Add experiment purpose or handoff notes."
           />
         </div>
 
         <div className="action-row">
           <button className="button" type="submit">
-            예약 저장
+            Save Booking
           </button>
           <button
             className="button-ghost"
             type="button"
             onClick={() => setDraft(createDefaultDraft())}
           >
-            새로 입력
+            Reset
           </button>
         </div>
       </form>
 
       <div className="rule-summary section">
         <span>
-          시작 예약 가능 범위: 오늘부터 {settings.bookingWindowDays}일 후까지
+          Start booking window: today through {settings.bookingWindowDays} days later
         </span>
         <span>
-          최대 사용 기간: {settings.maxDurationDays}일
+          Maximum usage duration: {settings.maxDurationDays} days
         </span>
         <span>
-          참고 마감일: {getLatestBookableDate(settings).toLocaleDateString('ko-KR')}
+          Reference end date:{' '}
+          {getLatestBookableDate(settings).toLocaleDateString('en-US')}
         </span>
       </div>
 

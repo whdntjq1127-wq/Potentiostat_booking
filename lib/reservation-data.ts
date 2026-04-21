@@ -59,7 +59,21 @@ export const DEFAULT_SETTINGS: ReservationSettings = {
   maxDurationDays: 5,
 };
 
-const DAY_NAMES = ['일', '월', '화', '수', '목', '금', '토'] as const;
+const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] as const;
+const MONTH_NAMES = [
+  'Jan',
+  'Feb',
+  'Mar',
+  'Apr',
+  'May',
+  'Jun',
+  'Jul',
+  'Aug',
+  'Sep',
+  'Oct',
+  'Nov',
+  'Dec',
+] as const;
 
 export function addDays(date: Date, days: number) {
   const next = new Date(date);
@@ -116,7 +130,7 @@ export function formatDisplayTime(date: Date) {
   const minute = date.getMinutes();
 
   if (minute === 0) {
-    return `${hour}시`;
+    return `${hour}:00`;
   }
 
   return `${hour}:${String(minute).padStart(2, '0')}`;
@@ -132,7 +146,7 @@ export function fromDateTimeLocal(value: string) {
 }
 
 export function formatDateLabel(date: Date) {
-  return `${date.getMonth() + 1}월 ${date.getDate()}일 (${DAY_NAMES[date.getDay()]})`;
+  return `${MONTH_NAMES[date.getMonth()]} ${date.getDate()} (${DAY_NAMES[date.getDay()]})`;
 }
 
 export function formatShortDateLabel(date: Date) {
@@ -140,7 +154,7 @@ export function formatShortDateLabel(date: Date) {
 }
 
 export function formatHourLabel(hour: number) {
-  return `${String(hour).padStart(2, '0')}시`;
+  return `${String(hour).padStart(2, '0')}:00`;
 }
 
 export function formatDateTimeLabel(value: string) {
@@ -321,29 +335,29 @@ export function compareChangeLogs(a: ChangeLogEntry, b: ChangeLogEntry) {
 }
 
 export function getStatusLabel(status: BookingStatus) {
-  return status === 'cancelled' ? '취소됨' : '예약 완료';
+  return status === 'cancelled' ? 'Cancelled' : 'Booked';
 }
 
 export function getChangeActionLabel(action: ChangeAction) {
   switch (action) {
     case 'booking_created':
-      return '예약 등록';
+      return 'Booking Created';
     case 'booking_updated':
-      return '예약 수정';
+      return 'Booking Updated';
     case 'booking_cancelled':
-      return '예약 취소';
+      return 'Booking Cancelled';
     case 'blocked_date_added':
-      return '차단일 추가';
+      return 'Blocked Date Added';
     case 'blocked_date_removed':
-      return '차단일 해제';
+      return 'Blocked Date Removed';
     case 'notice_added':
-      return '공지 추가';
+      return 'Notice Added';
     case 'notice_removed':
-      return '공지 삭제';
+      return 'Notice Removed';
     case 'settings_updated':
-      return '규칙 변경';
+      return 'Rule Updated';
     default:
-      return '변경';
+      return 'Change';
   }
 }
 
@@ -369,21 +383,21 @@ export function createInitialReservationState(
   const bookings: Booking[] = [
     {
       id: 'bk-001',
-      applicant: '김연구',
+      applicant: 'Dr. Kim',
       channel: 'CH 1',
       startAt: toDateTimeLocal(firstBookingStart),
       endAt: toDateTimeLocal(addHours(firstBookingStart, 1)),
-      purpose: '전극 안정성 측정',
+      purpose: 'Electrode stability test',
       status: 'active',
       createdAt: toDateTimeLocal(addHours(base, 9)),
     },
     {
       id: 'bk-002',
-      applicant: '박실험',
+      applicant: 'Dr. Park',
       channel: 'CH 2',
       startAt: toDateTimeLocal(secondBookingStart),
       endAt: toDateTimeLocal(addHours(secondBookingStart, 1)),
-      purpose: '임피던스 비교 실험',
+      purpose: 'Impedance comparison test',
       status: 'active',
       createdAt: toDateTimeLocal(addHours(base, 11)),
     },
@@ -393,20 +407,20 @@ export function createInitialReservationState(
     settings: DEFAULT_SETTINGS,
     blockedDates: [],
     notices: [
-      '이 사이트는 로그인 없이 이름만 입력해 예약하는 데모 버전입니다.',
-      '각 채널은 독립적으로 예약되며, 같은 채널 안에서만 시간 중복이 제한됩니다.',
-      '예약 생성, 수정, 취소는 모두 공개 로그북에 기록됩니다.',
+      'This demo lets users book without login by entering only their name.',
+      'Each channel is booked independently, and time conflicts are checked per channel.',
+      'All booking creations, edits, and cancellations are recorded in the public logbook.',
     ],
     changeLogs: [
       {
         id: 'log-001',
-        actor: '김연구',
+        actor: 'Dr. Kim',
         action: 'booking_created',
         summary: buildBookingSummary({
           channel: 'CH 1',
           startAt: toDateTimeLocal(firstBookingStart),
           endAt: toDateTimeLocal(addHours(firstBookingStart, 1)),
-          purpose: '전극 안정성 측정',
+          purpose: 'Electrode stability test',
         }),
         createdAt: addHours(base, 9).toISOString(),
         bookingId: 'bk-001',
@@ -416,13 +430,13 @@ export function createInitialReservationState(
       },
       {
         id: 'log-002',
-        actor: '박실험',
+        actor: 'Dr. Park',
         action: 'booking_created',
         summary: buildBookingSummary({
           channel: 'CH 2',
           startAt: toDateTimeLocal(secondBookingStart),
           endAt: toDateTimeLocal(addHours(secondBookingStart, 1)),
-          purpose: '임피던스 비교 실험',
+          purpose: 'Impedance comparison test',
         }),
         createdAt: addHours(base, 11).toISOString(),
         bookingId: 'bk-002',

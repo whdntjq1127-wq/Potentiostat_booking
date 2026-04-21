@@ -157,8 +157,8 @@ export default function Home() {
     return (
       <main>
         <section className="panel">
-          <div className="eyebrow">불러오는 중</div>
-          <h1 className="section-title">주간 예약 보드를 준비하고 있습니다.</h1>
+          <div className="eyebrow">Loading</div>
+          <h1 className="section-title">Preparing the weekly booking board.</h1>
         </section>
       </main>
     );
@@ -180,17 +180,17 @@ export default function Home() {
       <section className="panel board-panel calendar-panel">
           <div className="section-head">
             <div>
-              <div className="eyebrow">주간 달력</div>
-              <h2 className="section-title">1주일 예약 현황</h2>
+              <div className="eyebrow">Weekly Calendar</div>
+              <h2 className="section-title">7-Day Booking Status</h2>
             </div>
             <div className="rule-summary">
-              <span>{formatDateLabel(now)} 기준</span>
+              <span>As of {formatDateLabel(now)}</span>
               <span>
-                시작 가능 마감일: {formatDateLabel(latestBookableDate)}
+                Last start date: {formatDateLabel(latestBookableDate)}
               </span>
-              <span>예약 시간: 1시간 단위</span>
+              <span>Booking unit: 1-hour increments</span>
               <span>
-                <Link href="/my-bookings">내 예약 조회</Link>
+                <Link href="/my-bookings">View My Bookings</Link>
               </span>
             </div>
           </div>
@@ -220,15 +220,17 @@ export default function Home() {
       <section className="panel">
         <div className="section-head">
           <div>
-            <div className="eyebrow">공개 로그북</div>
-            <h2 className="section-title">예약 변경 기록</h2>
+            <div className="eyebrow">Public Logbook</div>
+            <h2 className="section-title">Booking Change History</h2>
           </div>
-          <div className="muted">예약 생성, 수정, 취소와 관리자 변경이 모두 남습니다.</div>
+          <div className="muted">
+            Booking creation, edits, cancellations, and admin changes are all recorded.
+          </div>
         </div>
 
         <div className="logbook-list section">
           {recentLogs.length === 0 ? (
-            <div className="empty-state">아직 기록된 변경 사항이 없습니다.</div>
+            <div className="empty-state">No changes have been recorded yet.</div>
           ) : (
             recentLogs.map((entry) => (
               <article key={entry.id} className="log-entry">
@@ -254,22 +256,22 @@ export default function Home() {
           >
             <div className="section-head">
               <div>
-                <div className="eyebrow">예약 등록</div>
-                <h2 className="section-title">선택한 칸으로 예약하기</h2>
+                <div className="eyebrow">Create Booking</div>
+                <h2 className="section-title">Book the Selected Slot</h2>
               </div>
               <button
                 type="button"
                 className="button-ghost"
                 onClick={() => setSelectedSlot(null)}
               >
-                닫기
+                Close
               </button>
             </div>
 
             <div className="selection-card modal-selection">
               <strong>{selectedSlot.channel}</strong>
-              <span>시작: {formatDateTimeLabel(selectedSlot.startAt)}</span>
-              <span>종료: {formatDateTimeLabel(endAt || selectedSlot.endAt)}</span>
+              <span>Start: {formatDateTimeLabel(selectedSlot.startAt)}</span>
+              <span>End: {formatDateTimeLabel(endAt || selectedSlot.endAt)}</span>
             </div>
 
             <form
@@ -296,19 +298,19 @@ export default function Home() {
               }}
             >
               <div className="field full">
-                <label htmlFor="modal-applicant">사용자 이름</label>
+                <label htmlFor="modal-applicant">User Name</label>
                 <input
                   id="modal-applicant"
                   type="text"
                   value={applicant}
                   onChange={(event) => setApplicant(event.target.value)}
-                  placeholder="예: 김연구"
+                  placeholder="e.g. Dr. Kim"
                   required
                 />
               </div>
 
               <div className="field">
-                <label htmlFor="modal-start">장비 사용 시작</label>
+                <label htmlFor="modal-start">Equipment Start</label>
                 <input
                   id="modal-start"
                   type="datetime-local"
@@ -318,7 +320,7 @@ export default function Home() {
               </div>
 
               <div className="field">
-                <label htmlFor="modal-end-date">장비 사용 종료</label>
+                <label htmlFor="modal-end-date">Equipment End</label>
                 <div className="end-picker-grid">
                   <select
                     id="modal-end-date"
@@ -356,30 +358,31 @@ export default function Home() {
               </div>
 
               <div className="field full">
-                <label htmlFor="modal-purpose">메모</label>
+                <label htmlFor="modal-purpose">Memo</label>
                 <textarea
                   id="modal-purpose"
                   value={purpose}
                   onChange={(event) => setPurpose(event.target.value)}
-                  placeholder="실험 메모나 전달 내용을 적어 주세요."
+                  placeholder="Add experiment notes or handoff details."
                 />
               </div>
 
               <div className="inline-note full-line">
-                시작 시각은 클릭한 칸으로 고정됩니다. 종료 시각은 1시간 단위로만 설정할 수
-                있고, 시작 시각으로부터 최대 {settings.maxDurationDays}일까지 선택할 수 있습니다.
+                The start time is fixed to the slot you clicked. The end time can only
+                be set in 1-hour increments, up to {settings.maxDurationDays} days
+                from the start time.
               </div>
 
               <div className="action-row">
                 <button className="button" type="submit">
-                  예약 저장
+                  Save Booking
                 </button>
                 <button
                   type="button"
                   className="button-ghost"
                   onClick={() => setSelectedSlot(null)}
                 >
-                  취소
+                  Cancel
                 </button>
               </div>
             </form>

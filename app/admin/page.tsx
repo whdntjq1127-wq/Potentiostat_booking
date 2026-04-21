@@ -53,8 +53,8 @@ export default function AdminPage() {
     return (
       <main>
         <section className="panel">
-          <div className="eyebrow">불러오는 중</div>
-          <h1 className="section-title">관리자 화면을 준비하고 있습니다.</h1>
+          <div className="eyebrow">Loading</div>
+          <h1 className="section-title">Preparing the admin page.</h1>
         </section>
       </main>
     );
@@ -64,8 +64,8 @@ export default function AdminPage() {
     return (
       <main className="admin-gate-page">
         <section className="panel admin-gate-card">
-          <div className="eyebrow">관리자 인증</div>
-          <h1 className="section-title">비밀번호를 입력해 관리자 설정에 들어가세요.</h1>
+          <div className="eyebrow">Admin Access</div>
+          <h1 className="section-title">Enter the password to open admin settings.</h1>
           <form
             className="section admin-gate-form"
             onSubmit={(event) => {
@@ -81,17 +81,17 @@ export default function AdminPage() {
                 return;
               }
 
-              setAuthMessage('비밀번호가 올바르지 않습니다.');
+              setAuthMessage('The password is incorrect.');
             }}
           >
             <input
               type="password"
               value={passwordInput}
               onChange={(event) => setPasswordInput(event.target.value)}
-              placeholder="관리자 비밀번호"
+              placeholder="Admin password"
             />
             <button className="button" type="submit">
-              관리자 페이지 열기
+              Open Admin Page
             </button>
           </form>
           {authMessage ? <div className="inline-message error">{authMessage}</div> : null}
@@ -105,10 +105,11 @@ export default function AdminPage() {
       <section className="panel">
         <div className="section-head">
           <div>
-            <div className="eyebrow">예약 규칙</div>
-            <h1 className="section-title">관리자 설정</h1>
+            <div className="eyebrow">Booking Rules</div>
+            <h1 className="section-title">Admin Settings</h1>
             <p className="muted">
-              시작 가능한 예약 범위와 시작 시각 기준 최대 사용 기간을 직접 바꿀 수 있습니다.
+              Adjust the start-date booking window and the maximum usage duration from
+              the selected start time.
             </p>
           </div>
           <button
@@ -121,7 +122,7 @@ export default function AdminPage() {
               setAuthenticated(false);
             }}
           >
-            잠금
+            Lock
           </button>
         </div>
 
@@ -134,7 +135,7 @@ export default function AdminPage() {
           }}
         >
           <div className="field">
-            <label htmlFor="booking-window">예약 가능 범위 (일)</label>
+            <label htmlFor="booking-window">Booking Window (days)</label>
             <input
               id="booking-window"
               type="number"
@@ -150,7 +151,7 @@ export default function AdminPage() {
           </div>
 
           <div className="field">
-            <label htmlFor="max-duration">최대 사용 기간 (일)</label>
+            <label htmlFor="max-duration">Maximum Usage Duration (days)</label>
             <input
               id="max-duration"
               type="number"
@@ -167,7 +168,7 @@ export default function AdminPage() {
 
           <div className="action-row">
             <button className="button" type="submit">
-              규칙 저장
+              Save Rules
             </button>
           </div>
         </form>
@@ -177,8 +178,8 @@ export default function AdminPage() {
 
       <section className="dashboard-grid">
         <article className="panel">
-          <div className="eyebrow">차단 날짜</div>
-          <h2 className="section-title">예약 불가 일정</h2>
+          <div className="eyebrow">Blocked Dates</div>
+          <h2 className="section-title">Unavailable Dates</h2>
           <form
             className="form-grid section"
             onSubmit={(event) => {
@@ -188,7 +189,7 @@ export default function AdminPage() {
             }}
           >
             <div className="field full">
-              <label htmlFor="blocked-date">차단할 날짜</label>
+              <label htmlFor="blocked-date">Date to Block</label>
               <input
                 id="blocked-date"
                 type="date"
@@ -198,14 +199,14 @@ export default function AdminPage() {
             </div>
             <div className="action-row">
               <button className="button" type="submit">
-                날짜 차단
+                Block Date
               </button>
             </div>
           </form>
           {blockedMessage ? <div className="inline-message">{blockedMessage}</div> : null}
           <div className="chip-row section">
             {blockedDates.length === 0 ? (
-              <span className="chip">차단된 날짜 없음</span>
+              <span className="chip">No blocked dates</span>
             ) : (
               blockedDates.map((date) => (
                 <button
@@ -214,7 +215,7 @@ export default function AdminPage() {
                   className="chip removable-chip"
                   onClick={() => removeBlockedDate(date)}
                 >
-                  {date} 삭제
+                  Remove {date}
                 </button>
               ))
             )}
@@ -222,8 +223,8 @@ export default function AdminPage() {
         </article>
 
         <article className="panel">
-          <div className="eyebrow">공지 관리</div>
-          <h2 className="section-title">운용 메모</h2>
+          <div className="eyebrow">Notice Management</div>
+          <h2 className="section-title">Operation Notes</h2>
           <form
             className="section"
             onSubmit={(event) => {
@@ -236,17 +237,17 @@ export default function AdminPage() {
             }}
           >
             <div className="field">
-              <label htmlFor="notice">공지 내용</label>
+              <label htmlFor="notice">Notice Content</label>
               <textarea
                 id="notice"
                 value={noticeInput}
                 onChange={(event) => setNoticeInput(event.target.value)}
-                placeholder="새로운 운용 규칙이나 공지를 입력하세요."
+                placeholder="Enter a new operation rule or notice."
               />
             </div>
             <div className="action-row">
               <button className="button" type="submit">
-                공지 추가
+                Add Notice
               </button>
             </div>
           </form>
@@ -260,7 +261,7 @@ export default function AdminPage() {
                   className="button-ghost"
                   onClick={() => removeNotice(notice)}
                 >
-                  삭제
+                  Delete
                 </button>
               </div>
             ))}
@@ -269,8 +270,8 @@ export default function AdminPage() {
       </section>
 
       <section className="panel">
-        <div className="eyebrow">현재 예약</div>
-        <h2 className="section-title">등록된 예약 목록</h2>
+        <div className="eyebrow">Current Bookings</div>
+        <h2 className="section-title">Registered Booking List</h2>
         <div className="reservation-list section">
           {bookings.map((booking) => (
             <article
@@ -293,11 +294,11 @@ export default function AdminPage() {
               </div>
               <div className="card-head">
                 <span className={`status ${booking.status}`}>
-                  {booking.status === 'active' ? '예약 완료' : '취소됨'}
+                  {booking.status === 'active' ? 'Booked' : 'Cancelled'}
                 </span>
               </div>
               <div className="muted">
-                {booking.purpose || '메모 없이 등록된 예약입니다.'}
+                {booking.purpose || 'This booking has no memo.'}
               </div>
               {booking.status === 'active' ? (
                 <div className="action-row">
@@ -307,11 +308,11 @@ export default function AdminPage() {
                     onClick={() =>
                       cancelBooking({
                         id: booking.id,
-                        requestedBy: '관리자',
+                        requestedBy: 'Admin',
                       })
                     }
                   >
-                    관리자 취소
+                    Admin Cancel
                   </button>
                 </div>
               ) : null}

@@ -5,9 +5,9 @@ import { usePathname } from 'next/navigation';
 import type { ReactNode } from 'react';
 
 const navItems = [
-  { href: '/', label: '주간 보드' },
-  { href: '/my-bookings', label: '내 예약 조회' },
-  { href: '/admin', label: '관리자 설정' },
+  { href: '/', label: 'Weekly Board' },
+  { href: '/my-bookings', label: 'My Bookings' },
+  { href: '/admin', label: 'Admin Settings' },
 ];
 
 export function SiteShell({ children }: { children: ReactNode }) {
@@ -19,11 +19,11 @@ export function SiteShell({ children }: { children: ReactNode }) {
         <div className="brand">
           <div className="brand-mark">PS</div>
           <div className="brand-copy">
-            <strong>Potentiostat 예약 보드</strong>
-            <span>CH 1, CH 2, CH 3 통합 예약 데모</span>
+            <strong>Potentiostat Booking Board</strong>
+            <span>CH 1, CH 2, CH 3 integrated booking demo</span>
           </div>
         </div>
-        <nav className="nav-links" aria-label="주요 메뉴">
+        <nav className="nav-links" aria-label="Primary navigation">
           {navItems.map((item) => (
             <Link
               key={item.href}
@@ -38,8 +38,8 @@ export function SiteShell({ children }: { children: ReactNode }) {
       </header>
       <div className="page">{children}</div>
       <div className="footer-note">
-        이 화면은 브라우저 안에서만 동작하는 데모입니다. 로그인은 없고, 관리자 규칙도
-        현재 브라우저에만 저장됩니다.
+        This is a browser-only demo. There is no login, and admin rules are stored
+        only in the current browser.
       </div>
     </div>
   );

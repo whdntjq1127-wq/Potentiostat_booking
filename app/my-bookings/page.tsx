@@ -43,8 +43,8 @@ export default function MyBookingsPage() {
     return (
       <main>
         <section className="panel">
-          <div className="eyebrow">불러오는 중</div>
-          <h1 className="section-title">예약 목록을 준비하고 있습니다.</h1>
+          <div className="eyebrow">Loading</div>
+          <h1 className="section-title">Preparing the booking list.</h1>
         </section>
       </main>
     );
@@ -64,14 +64,15 @@ export default function MyBookingsPage() {
   return (
     <main className="lookup-layout">
       <section className="panel">
-        <div className="eyebrow">내 예약 찾기</div>
-        <h1 className="section-title">이름으로 예약 조회</h1>
+        <div className="eyebrow">Find My Bookings</div>
+        <h1 className="section-title">Search Bookings by Name</h1>
         <p className="muted">
-          로그인 대신 이름으로 예약을 찾습니다. 예약을 등록할 때 사용한 이름과 정확히
-          같아야 합니다.
+          This demo uses names instead of login. Enter the exact name used when the
+          booking was created.
         </p>
         <p className="muted">
-          예약 생성, 수정, 취소는 모두 메인 화면의 공개 로그북에 기록됩니다.
+          Booking creation, edits, and cancellations are all recorded in the public
+          logbook on the main page.
         </p>
 
         <div className="lookup-bar section">
@@ -79,17 +80,17 @@ export default function MyBookingsPage() {
             type="text"
             value={query}
             onChange={(event) => setQuery(event.target.value)}
-            placeholder="예: 김연구"
+            placeholder="e.g. Dr. Kim"
           />
         </div>
 
         <div className="reservation-list section">
           {!query.trim() ? (
             <div className="empty-state">
-              먼저 사용자 이름을 입력해 내 예약만 좁혀서 보세요.
+              Enter a user name first to filter your bookings.
             </div>
           ) : filtered.length === 0 ? (
-            <div className="empty-state">해당 이름으로 등록된 예약이 없습니다.</div>
+            <div className="empty-state">No bookings were found for this name.</div>
           ) : (
             filtered.map((booking) => (
               <article
@@ -118,7 +119,7 @@ export default function MyBookingsPage() {
                 </div>
 
                 <div className="muted">
-                  {booking.purpose || '메모 없이 등록된 예약입니다.'}
+                  {booking.purpose || 'This booking has no memo.'}
                 </div>
 
                 {booking.status === 'active' ? (
@@ -132,7 +133,7 @@ export default function MyBookingsPage() {
                           : beginEdit(booking)
                       }
                     >
-                      {editingId === booking.id ? '수정 닫기' : '예약 수정'}
+                      {editingId === booking.id ? 'Close Edit' : 'Edit Booking'}
                     </button>
                     <button
                       type="button"
@@ -144,7 +145,7 @@ export default function MyBookingsPage() {
                         })
                       }
                     >
-                      예약 취소
+                      Cancel Booking
                     </button>
                   </div>
                 ) : null}
@@ -169,7 +170,7 @@ export default function MyBookingsPage() {
                     }}
                   >
                     <div className="field">
-                      <label htmlFor={`channel-${booking.id}`}>채널</label>
+                      <label htmlFor={`channel-${booking.id}`}>Channel</label>
                       <select
                         id={`channel-${booking.id}`}
                         value={editDraft.channel}
@@ -193,7 +194,7 @@ export default function MyBookingsPage() {
                     </div>
 
                     <div className="field">
-                      <label htmlFor={`start-${booking.id}`}>시작 시각</label>
+                      <label htmlFor={`start-${booking.id}`}>Start Time</label>
                       <input
                         id={`start-${booking.id}`}
                         type="datetime-local"
@@ -213,7 +214,7 @@ export default function MyBookingsPage() {
                     </div>
 
                     <div className="field">
-                      <label htmlFor={`end-${booking.id}`}>종료 시각</label>
+                      <label htmlFor={`end-${booking.id}`}>End Time</label>
                       <input
                         id={`end-${booking.id}`}
                         type="datetime-local"
@@ -236,7 +237,7 @@ export default function MyBookingsPage() {
                     </div>
 
                     <div className="field full">
-                      <label htmlFor={`purpose-${booking.id}`}>메모</label>
+                      <label htmlFor={`purpose-${booking.id}`}>Memo</label>
                       <textarea
                         id={`purpose-${booking.id}`}
                         value={editDraft.purpose}
@@ -254,20 +255,20 @@ export default function MyBookingsPage() {
                     </div>
 
                     <div className="inline-note">
-                      시작과 종료는 1시간 단위로만 입력할 수 있습니다. 예: 13시~18시 가능,
-                      13시~18시30분 불가
+                      Start and end times must use 1-hour increments. Example:
+                      13:00-18:00 is allowed, 13:00-18:30 is not.
                     </div>
 
                     <div className="action-row">
                       <button className="button" type="submit">
-                        수정 저장
+                        Save Changes
                       </button>
                       <button
                         type="button"
                         className="button-ghost"
                         onClick={() => setEditingId(null)}
                       >
-                        닫기
+                        Close
                       </button>
                     </div>
                   </form>

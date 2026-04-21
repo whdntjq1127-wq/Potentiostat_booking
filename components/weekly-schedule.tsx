@@ -81,7 +81,7 @@ export function WeeklySchedule({
           className="button-ghost"
           onClick={() => onShiftWeek(-1)}
         >
-          이전 주
+          Previous Week
         </button>
         <strong>
           {formatShortDateLabel(weekDates[0])} -{' '}
@@ -92,7 +92,7 @@ export function WeeklySchedule({
           className="button-ghost"
           onClick={() => onShiftWeek(1)}
         >
-          다음 주
+          Next Week
         </button>
       </div>
 
@@ -100,8 +100,8 @@ export function WeeklySchedule({
         <table className="schedule-table">
           <thead>
             <tr>
-              <th className="corner-cell time-head">시간</th>
-              <th className="corner-cell channel-head">채널</th>
+              <th className="corner-cell time-head">Time</th>
+              <th className="corner-cell channel-head">Channel</th>
               {weekDates.map((date) => (
                 <th key={toDateKey(date)}>{formatShortDateLabel(date)}</th>
               ))}
@@ -212,12 +212,12 @@ export function WeeklySchedule({
                           disabled={!selectable}
                           title={
                             visibleBooking
-                              ? `${visibleBooking.applicant}님 예약`
+                              ? `${visibleBooking.applicant}'s booking`
                               : inBlockedDate
-                                  ? '관리자에 의해 차단된 날짜입니다'
+                                  ? 'This date is blocked by the admin'
                                   : inWindow
-                                    ? '선택할 수 없는 슬롯입니다'
-                                    : '예약 가능 범위를 벗어난 시작 날짜입니다'
+                                    ? 'This slot cannot be selected'
+                                    : 'The start date is outside the booking window'
                           }
                         >
                           {visibleBooking ? visibleBooking.applicant : selectable ? '' : '/'}
