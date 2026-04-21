@@ -525,7 +525,7 @@ button {
 }
 
 .schedule-table thead tr:nth-child(2) th {
-  top: 38px;
+  top: 37px;
   z-index: 7;
 }
 
@@ -568,19 +568,23 @@ button {
 
 .date-head {
   min-width: 156px;
-  padding: 11px 8px;
+  height: 37px;
+  padding: 0 8px;
   border-right: 2px solid var(--line-strong) !important;
+  vertical-align: middle;
 }
 
 .channel-subhead {
   min-width: 52px;
   width: 52px;
-  padding: 7px 6px;
+  height: 30px;
+  padding: 0 6px;
   background: var(--channel-color, #f7fbf9);
   color: #15322a;
   font-size: 0.74rem;
   letter-spacing: 0.02em;
   box-shadow: none;
+  vertical-align: middle;
 }
 
 .date-end-cell {
@@ -590,11 +594,12 @@ button {
 .slot-cell {
   min-width: 52px;
   background: var(--channel-color-soft, transparent);
+  border-bottom: 2px solid var(--line-strong) !important;
 }
 
 .slot-button {
   width: 100%;
-  min-height: 24px;
+  min-height: 30px;
   padding: 3px 6px;
   background: var(--channel-color-soft, transparent);
   color: var(--text);
@@ -604,6 +609,10 @@ button {
   overflow: hidden;
   text-overflow: ellipsis;
   opacity: 1;
+}
+
+.time-group-cell {
+  border-bottom: 2px solid var(--line-strong) !important;
 }
 
 .slot-button.available {

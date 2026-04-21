@@ -48,7 +48,7 @@ export function WeeklySchedule({
     () =>
       Array.from({ length: 24 }, (_, hour) => ({
         hour,
-        label: `${String(hour).padStart(2, '0')}:00~${String((hour + 1) % 24).padStart(2, '0')}:00`,
+        label: `${String(hour).padStart(2, '0')}:00`,
       })),
     [],
   );
