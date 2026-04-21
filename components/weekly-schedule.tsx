@@ -101,7 +101,7 @@ export function WeeklySchedule({
           <thead>
             <tr>
               <th className="corner-cell time-head" rowSpan={2}>
-                Time
+                Starting time
               </th>
               {weekDates.map((date) => (
                 <th
