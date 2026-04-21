@@ -14,12 +14,12 @@ import {
   compareBookings,
   compareChangeLogs,
   createInitialReservationState,
+  findActiveBookingConflict,
   fromDateTimeLocal,
-  getCoveredDateKeys,
+  getBlockedDateInRange,
   getBookingExpiryDate,
   getLatestAllowedEnd,
   isStartWithinBookingWindow,
-  overlaps,
   pruneExpiredReservationState,
   type Booking,
   type Channel,
@@ -45,6 +45,13 @@ type ReservationContextValue = {
   addBooking: (input: {
     applicant: string;
     channel: Channel;
+    startAt: string;
+    endAt: string;
+    purpose: string;
+  }) => ActionResult;
+  addBookings: (input: {
+    applicant: string;
+    channels: Channel[];
     startAt: string;
     endAt: string;
     purpose: string;
@@ -82,35 +89,6 @@ function parseStoredState() {
   } catch {
     return null;
   }
-}
-
-function isActive(booking: Booking) {
-  return booking.status === 'active';
-}
-
-function getConflictBooking(
-  bookings: Booking[],
-  channel: Channel,
-  start: Date,
-  end: Date,
-  ignoreId?: string,
-) {
-  return bookings.find((booking) => {
-    if (
-      !isActive(booking) ||
-      booking.id === ignoreId ||
-      booking.channel !== channel
-    ) {
-      return false;
-    }
-
-    return overlaps(
-      start,
-      end,
-      new Date(booking.startAt),
-      new Date(booking.endAt),
-    );
-  });
 }
 
 function isHourAlignedRange(start: Date, end: Date) {
@@ -216,19 +194,24 @@ export function ReservationProvider({ children }: { children: ReactNode }) {
   }, [ready, snapshot]);
 
   const value = useMemo<ReservationContextValue>(
-    () => ({
-      ready,
-      bookings: snapshot.bookings,
-      blockedDates: snapshot.blockedDates,
-      notices: snapshot.notices,
-      settings: snapshot.settings,
-      changeLogs: snapshot.changeLogs,
-      addBooking: ({ applicant, channel, startAt, endAt, purpose }) => {
+    () => {
+      const addBookings: ReservationContextValue['addBookings'] = ({
+        applicant,
+        channels,
+        startAt,
+        endAt,
+        purpose,
+      }) => {
         const trimmedApplicant = applicant.trim();
         const trimmedPurpose = purpose.trim();
+        const selectedChannels = Array.from(new Set(channels));
 
         if (!trimmedApplicant) {
           return { ok: false, message: 'User name is required.' };
+        }
+
+        if (selectedChannels.length === 0) {
+          return { ok: false, message: 'Select at least one channel.' };
         }
 
         const start = fromDateTimeLocal(startAt);
@@ -265,8 +248,10 @@ export function ReservationProvider({ children }: { children: ReactNode }) {
           };
         }
 
-        const blockedDate = getCoveredDateKeys(start, end).find((dateKey) =>
-          snapshot.blockedDates.includes(dateKey),
+        const blockedDate = getBlockedDateInRange(
+          snapshot.blockedDates,
+          start,
+          end,
         );
 
         if (blockedDate) {
@@ -276,64 +261,95 @@ export function ReservationProvider({ children }: { children: ReactNode }) {
           };
         }
 
-        const conflict = getConflictBooking(
-          snapshot.bookings,
-          channel,
-          start,
-          end,
-        );
+        const conflicts = selectedChannels
+          .map((channel) => ({
+            channel,
+            booking: findActiveBookingConflict(
+              snapshot.bookings,
+              channel,
+              start,
+              end,
+            ),
+          }))
+          .filter((item) => item.booking);
 
-        if (conflict) {
+        if (conflicts.length > 0) {
+          const conflictLabels = conflicts
+            .map((item) => `${item.channel} (${item.booking?.applicant})`)
+            .join(', ');
           return {
             ok: false,
-            message: `This overlaps with ${conflict.applicant}'s existing booking.`,
+            message: `Selected channels overlap with existing bookings: ${conflictLabels}.`,
           };
         }
 
         const createdAt = new Date();
-        const newBooking: Booking = {
-          id: `bk-${createdAt.getTime()}`,
+        const createdAtIso = createdAt.toISOString();
+        const newBookings: Booking[] = selectedChannels.map((channel, index) => ({
+          id: `bk-${createdAt.getTime()}-${channel.replace(/\s+/g, '').toLowerCase()}-${index}`,
           applicant: trimmedApplicant,
           channel,
           startAt,
           endAt,
           purpose: trimmedPurpose,
           status: 'active',
-          createdAt: createdAt.toISOString(),
-        };
+          createdAt: createdAtIso,
+        }));
 
         setSnapshot((current) => {
           const base = pruneExpiredReservationState(current);
+          const newLogs = newBookings.map((booking) =>
+            createLogEntry(
+              'booking_created',
+              trimmedApplicant,
+              buildBookingSummary({
+                channel: booking.channel,
+                startAt,
+                endAt,
+                purpose: trimmedPurpose,
+              }),
+              {
+                bookingId: booking.id,
+                expiresAt: getBookingExpiryDate(endAt)?.toISOString(),
+              },
+            ),
+          );
 
           return {
             ...base,
-            bookings: [...base.bookings, newBooking].sort(compareBookings),
-            changeLogs: [
-              createLogEntry(
-                'booking_created',
-                trimmedApplicant,
-                buildBookingSummary({
-                  channel,
-                  startAt,
-                  endAt,
-                  purpose: trimmedPurpose,
-                }),
-                {
-                  bookingId: newBooking.id,
-                  expiresAt: getBookingExpiryDate(endAt)?.toISOString(),
-                },
-              ),
-              ...base.changeLogs,
-            ].sort(compareChangeLogs),
+            bookings: [...base.bookings, ...newBookings].sort(compareBookings),
+            changeLogs: [...newLogs, ...base.changeLogs].sort(compareChangeLogs),
           };
         });
 
         return {
           ok: true,
-          message: `${trimmedApplicant}'s booking has been saved.`,
+          message:
+            selectedChannels.length === 1
+              ? `${trimmedApplicant}'s booking has been saved.`
+              : `${trimmedApplicant}'s bookings have been saved for ${selectedChannels.join(
+                  ', ',
+                )}.`,
         };
-      },
-      updateBooking: ({ id, requestedBy, channel, startAt, endAt, purpose }) => {
+      };
+
+      return {
+        ready,
+        bookings: snapshot.bookings,
+        blockedDates: snapshot.blockedDates,
+        notices: snapshot.notices,
+        settings: snapshot.settings,
+        changeLogs: snapshot.changeLogs,
+        addBookings,
+        addBooking: ({ applicant, channel, startAt, endAt, purpose }) =>
+          addBookings({
+            applicant,
+            channels: [channel],
+            startAt,
+            endAt,
+            purpose,
+          }),
+        updateBooking: ({ id, requestedBy, channel, startAt, endAt, purpose }) => {
         const target = snapshot.bookings.find((booking) => booking.id === id);
 
         if (!target) {
@@ -374,8 +390,10 @@ export function ReservationProvider({ children }: { children: ReactNode }) {
           };
         }
 
-        const blockedDate = getCoveredDateKeys(start, end).find((dateKey) =>
-          snapshot.blockedDates.includes(dateKey),
+        const blockedDate = getBlockedDateInRange(
+          snapshot.blockedDates,
+          start,
+          end,
         );
 
         if (blockedDate) {
@@ -385,7 +403,7 @@ export function ReservationProvider({ children }: { children: ReactNode }) {
           };
         }
 
-        const conflict = getConflictBooking(
+        const conflict = findActiveBookingConflict(
           snapshot.bookings,
           channel,
           start,
@@ -604,7 +622,8 @@ export function ReservationProvider({ children }: { children: ReactNode }) {
 
         return { ok: true, message: 'Booking rules have been saved.' };
       },
-    }),
+      };
+    },
     [ready, snapshot],
   );
 

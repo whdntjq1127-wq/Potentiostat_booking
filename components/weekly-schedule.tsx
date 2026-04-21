@@ -5,12 +5,12 @@ import { useReservation } from './reservation-context';
 import {
   CHANNELS,
   addHours,
+  findActiveBookingConflict,
   formatShortDateLabel,
   getChannelColor,
   getChannelSoftColor,
   getWeekDates,
   isStartWithinBookingWindow,
-  overlaps,
   setHour,
   toDateKey,
   toDateTimeLocal,
@@ -39,7 +39,6 @@ export function WeeklySchedule({
   onShiftWeek,
 }: WeeklyScheduleProps) {
   const { bookings, blockedDates, settings } = useReservation();
-  const scheduleWrapRef = useRef<HTMLDivElement | null>(null);
   const hourRowRefs = useRef<Record<number, HTMLTableRowElement | null>>({});
   const previousHourRef = useRef<number | null>(null);
   const weekDates = getWeekDates(anchorDate);
@@ -54,22 +53,23 @@ export function WeeklySchedule({
   );
 
   useEffect(() => {
-    const container = scheduleWrapRef.current;
     const targetRow = hourRowRefs.current[currentHour];
 
-    if (!container || !targetRow) {
+    if (!targetRow) {
       previousHourRef.current = currentHour;
       return;
     }
 
-    const headerHeight = container.querySelector('thead')?.clientHeight ?? 0;
-    const nextTop = Math.max(targetRow.offsetTop - headerHeight, 0);
+    const nextTop = Math.max(
+      targetRow.getBoundingClientRect().top + window.scrollY - 190,
+      0,
+    );
     const behavior =
       previousHourRef.current === null || previousHourRef.current === currentHour
         ? 'auto'
         : 'smooth';
 
-    container.scrollTo({ top: nextTop, behavior });
+    window.scrollTo({ top: nextTop, behavior });
     previousHourRef.current = currentHour;
   }, [anchorDate, currentHour]);
 
@@ -96,7 +96,7 @@ export function WeeklySchedule({
         </button>
       </div>
 
-      <div ref={scheduleWrapRef} className="schedule-wrap">
+      <div className="schedule-wrap">
         <table className="schedule-table">
           <thead>
             <tr>
@@ -159,22 +159,12 @@ export function WeeklySchedule({
                     const slotEnd = addHours(slotStart, 1);
                     const slotDateKey = toDateKey(slotStart);
 
-                    const activeBooking = bookings.find((booking) => {
-                      if (booking.status !== 'active') {
-                        return false;
-                      }
-
-                      if (booking.channel !== channel) {
-                        return false;
-                      }
-
-                      return overlaps(
-                        slotStart,
-                        slotEnd,
-                        new Date(booking.startAt),
-                        new Date(booking.endAt),
-                      );
-                    });
+                    const activeBooking = findActiveBookingConflict(
+                      bookings,
+                      channel,
+                      slotStart,
+                      slotEnd,
+                    );
 
                     const visibleBooking = activeBooking ?? null;
                     const inBlockedDate = blockedDates.includes(slotDateKey);

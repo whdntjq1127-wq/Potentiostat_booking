@@ -1,21 +1,24 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type CSSProperties } from 'react';
 import Link from 'next/link';
 import { useReservation } from '../components/reservation-context';
 import { WeeklySchedule, type SelectedSlot } from '../components/weekly-schedule';
 import {
+  CHANNELS,
   addDays,
   formatDateLabel,
   formatDateTimeLabel,
   formatDisplayTime,
+  findActiveBookingConflict,
+  getBlockedDateInRange,
+  getChannelColor,
   getLatestBookableDate,
   addHours,
   formatShortDateLabel,
-  getCoveredDateKeys,
   getLatestAllowedEnd,
-  overlaps,
   toDateKey,
+  type Channel,
 } from '../lib/reservation-data';
 
 type EndOption = {
@@ -26,12 +29,13 @@ type EndOption = {
 };
 
 export default function Home() {
-  const { ready, addBooking, bookings, blockedDates, settings } =
+  const { ready, addBookings, bookings, blockedDates, settings } =
     useReservation();
   const [mounted, setMounted] = useState(false);
   const [now, setNow] = useState<Date | null>(null);
   const [weekAnchor, setWeekAnchor] = useState<Date | null>(null);
   const [selectedSlot, setSelectedSlot] = useState<SelectedSlot | null>(null);
+  const [selectedChannels, setSelectedChannels] = useState<Channel[]>([]);
   const [applicant, setApplicant] = useState('');
   const [purpose, setPurpose] = useState('');
   const [endAt, setEndAt] = useState('');
@@ -79,9 +83,11 @@ export default function Home() {
 
   useEffect(() => {
     if (!selectedSlot) {
+      setSelectedChannels([]);
       return;
     }
 
+    setSelectedChannels([selectedSlot.channel]);
     setApplicant('');
     setPurpose('');
     setEndAt(selectedSlot.endAt);
@@ -101,26 +107,18 @@ export default function Home() {
       candidate <= latestEnd;
       candidate = addHours(candidate, 1)
     ) {
-      const blockedDate = getCoveredDateKeys(start, candidate).find((dateKey) =>
-        blockedDates.includes(dateKey),
-      );
+      const blockedDate = getBlockedDateInRange(blockedDates, start, candidate);
 
       if (blockedDate) {
         break;
       }
 
-      const hasConflict = bookings.some((booking) => {
-        if (booking.status !== 'active' || booking.channel !== selectedSlot.channel) {
-          return false;
-        }
-
-        return overlaps(
-          start,
-          candidate,
-          new Date(booking.startAt),
-          new Date(booking.endAt),
-        );
-      });
+      const hasConflict = findActiveBookingConflict(
+        bookings,
+        selectedSlot.channel,
+        start,
+        candidate,
+      );
 
       if (hasConflict) {
         break;
@@ -152,6 +150,57 @@ export default function Home() {
     }
   }, [availableEndOptions, endAt, selectedSlot]);
 
+  const selectedRange = useMemo(() => {
+    if (!selectedSlot || !endAt) {
+      return null;
+    }
+
+    const start = new Date(selectedSlot.startAt);
+    const end = new Date(endAt);
+
+    if (
+      Number.isNaN(start.getTime()) ||
+      Number.isNaN(end.getTime()) ||
+      end <= start
+    ) {
+      return null;
+    }
+
+    return { start, end };
+  }, [endAt, selectedSlot]);
+
+  const channelAvailability = useMemo(
+    () =>
+      CHANNELS.map((channel) => ({
+        channel,
+        conflict: selectedRange
+          ? findActiveBookingConflict(
+              bookings,
+              channel,
+              selectedRange.start,
+              selectedRange.end,
+            )
+          : undefined,
+      })),
+    [bookings, selectedRange],
+  );
+
+  useEffect(() => {
+    if (!selectedSlot) {
+      return;
+    }
+
+    const unavailableChannels = new Set(
+      channelAvailability
+        .filter((item) => item.conflict)
+        .map((item) => item.channel),
+    );
+
+    setSelectedChannels((current) =>
+      current.filter((channel) => !unavailableChannels.has(channel)),
+    );
+  }, [channelAvailability, selectedSlot]);
+
   if (!ready || !mounted || !now || !weekAnchor) {
     return (
       <main>
@@ -172,6 +221,26 @@ export default function Home() {
   const endTimeOptions = availableEndOptions.filter(
     (option) => option.dateKey === selectedEndDate,
   );
+  const selectedChannelSet = new Set(selectedChannels);
+  const selectedChannelLabel =
+    selectedChannels.length > 0 ? selectedChannels.join(', ') : 'No channel selected';
+  const canSaveBooking = selectedChannels.length > 0 && !!endAt;
+  const toggleChannel = (channel: Channel) => {
+    const availability = channelAvailability.find(
+      (item) => item.channel === channel,
+    );
+
+    if (availability?.conflict) {
+      return;
+    }
+
+    setSelectedChannels((current) =>
+      current.includes(channel)
+        ? current.filter((item) => item !== channel)
+        : [...current, channel],
+    );
+  };
+
   return (
     <main className="calendar-page">
       <section className="panel board-panel calendar-panel">
@@ -235,7 +304,7 @@ export default function Home() {
             </div>
 
             <div className="selection-card modal-selection">
-              <strong>{selectedSlot.channel}</strong>
+              <strong>{selectedChannelLabel}</strong>
               <span>Start: {formatDateTimeLabel(selectedSlot.startAt)}</span>
               <span>End: {formatDateTimeLabel(endAt || selectedSlot.endAt)}</span>
             </div>
@@ -245,9 +314,9 @@ export default function Home() {
               onSubmit={(event) => {
                 event.preventDefault();
 
-                const result = addBooking({
+                const result = addBookings({
                   applicant,
-                  channel: selectedSlot.channel,
+                  channels: selectedChannels,
                   startAt: selectedSlot.startAt,
                   endAt,
                   purpose,
@@ -257,6 +326,7 @@ export default function Home() {
 
                 if (result.ok) {
                   setSelectedSlot(null);
+                  setSelectedChannels([]);
                   setApplicant('');
                   setPurpose('');
                   setEndAt('');
@@ -273,6 +343,49 @@ export default function Home() {
                   placeholder="e.g. Dr. Kim"
                   required
                 />
+              </div>
+
+              <div className="field full">
+                <label>Channels</label>
+                <div className="channel-picker">
+                  {channelAvailability.map(({ channel, conflict }) => {
+                    const selected = selectedChannelSet.has(channel);
+                    const channelStyle = {
+                      '--channel-color': getChannelColor(channel),
+                    } as CSSProperties;
+
+                    return (
+                      <button
+                        key={channel}
+                        type="button"
+                        className={`channel-toggle ${selected ? 'selected' : ''}`}
+                        style={channelStyle}
+                        disabled={!!conflict}
+                        onClick={() => toggleChannel(channel)}
+                        title={
+                          conflict
+                            ? `${conflict.applicant}'s booking overlaps this time range`
+                            : selected
+                              ? `${channel} selected`
+                              : `Add ${channel}`
+                        }
+                      >
+                        <span>{channel}</span>
+                        <small>
+                          {conflict
+                            ? 'Booked'
+                            : selected
+                              ? 'Selected'
+                              : 'Available'}
+                        </small>
+                      </button>
+                    );
+                  })}
+                </div>
+                <div className="inline-note">
+                  Channels already booked during the selected time range are disabled.
+                  Select multiple available channels to reserve them together.
+                </div>
               </div>
 
               <div className="field">
@@ -340,7 +453,7 @@ export default function Home() {
               </div>
 
               <div className="action-row">
-                <button className="button" type="submit">
+                <button className="button" type="submit" disabled={!canSaveBooking}>
                   Save Booking
                 </button>
                 <button

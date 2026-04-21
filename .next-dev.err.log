@@ -55,3 +55,21 @@ Caused by:
 Import trace for requested module:
 ./components/weekly-schedule.tsx
 ./app/page.tsx
+ ⨯ ./components/reservation-context.tsx
+Error:   [31mx[0m Expected ';', got ')'
+     ,-[[36;1;4mC:\Users\JWS\Documents\GitHub\Potentiostat_booking\components\reservation-context.tsx[0m:645:1]
+ [2m642[0m | 
+ [2m643[0m |         return { ok: true, message: 'Booking rules have been saved.' };
+ [2m644[0m |       },
+ [2m645[0m |     }),
+     : [35;1m     ^[0m
+ [2m646[0m |     [ready, snapshot],
+ [2m647[0m |   );
+     `----
+
+Caused by:
+    Syntax Error
+
+Import trace for requested module:
+./components/reservation-context.tsx
+./app/page.tsx

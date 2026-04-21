@@ -224,6 +224,26 @@ export function overlaps(
   return startA < endB && endA > startB;
 }
 
+export function findActiveBookingConflict(
+  bookings: Booking[],
+  channel: Channel,
+  start: Date,
+  end: Date,
+  ignoreId?: string,
+) {
+  return bookings.find((booking) => {
+    if (
+      booking.status !== 'active' ||
+      booking.id === ignoreId ||
+      booking.channel !== channel
+    ) {
+      return false;
+    }
+
+    return overlaps(start, end, new Date(booking.startAt), new Date(booking.endAt));
+  });
+}
+
 export function getCoveredDateKeys(start: Date, end: Date) {
   const covered: string[] = [];
   const cursor = startOfDay(start);
@@ -234,6 +254,16 @@ export function getCoveredDateKeys(start: Date, end: Date) {
   }
 
   return covered;
+}
+
+export function getBlockedDateInRange(
+  blockedDates: string[],
+  start: Date,
+  end: Date,
+) {
+  return getCoveredDateKeys(start, end).find((dateKey) =>
+    blockedDates.includes(dateKey),
+  );
 }
 
 export function isStartWithinBookingWindow(

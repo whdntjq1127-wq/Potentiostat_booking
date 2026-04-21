@@ -288,6 +288,15 @@ button {
   transform: translateY(-1px);
 }
 
+.button:disabled,
+.button-ghost:disabled,
+.button-warning:disabled,
+.button-danger:disabled {
+  cursor: not-allowed;
+  opacity: 0.54;
+  transform: none;
+}
+
 .button {
   background: var(--primary);
   color: #fff;
@@ -499,12 +508,13 @@ button {
 }
 
 .schedule-wrap {
-  overflow: auto;
+  overflow-x: auto;
+  overflow-y: visible;
   border-radius: 20px;
   border: 1px solid var(--line-strong);
   background: rgba(255, 255, 255, 0.84);
   min-height: 0;
-  max-height: calc(100vh - 250px);
+  max-height: none;
   scroll-behavior: smooth;
 }
 
@@ -517,7 +527,7 @@ button {
 
 .schedule-table thead th {
   position: sticky;
-  top: 0;
+  top: 92px;
   z-index: 8;
   background: #f7fbf9;
   color: var(--primary-strong);
@@ -526,7 +536,7 @@ button {
 }
 
 .schedule-table thead tr:nth-child(2) th {
-  top: 37px;
+  top: 129px;
   z-index: 7;
 }
 
@@ -751,6 +761,55 @@ button {
   gap: 10px;
 }
 
+.channel-picker {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.channel-toggle {
+  display: grid;
+  gap: 4px;
+  padding: 14px 16px;
+  border-radius: 16px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.9);
+  color: var(--text);
+  cursor: pointer;
+  text-align: left;
+  box-shadow: inset 6px 0 0 var(--channel-color, var(--line-strong));
+  transition:
+    background-color 160ms ease,
+    border-color 160ms ease,
+    transform 160ms ease;
+}
+
+.channel-toggle:hover {
+  transform: translateY(-1px);
+  border-color: var(--channel-color, var(--line-strong));
+}
+
+.channel-toggle.selected {
+  border-color: var(--primary);
+  background: var(--primary-soft);
+}
+
+.channel-toggle:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+  background: rgba(237, 241, 239, 0.72);
+  transform: none;
+}
+
+.channel-toggle span {
+  font-weight: 800;
+}
+
+.channel-toggle small {
+  color: var(--muted);
+  font-weight: 700;
+}
+
 .channel-card {
   box-shadow:
     inset 8px 0 0 var(--channel-color, transparent),
@@ -792,6 +851,10 @@ button {
   }
 
   .end-picker-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .channel-picker {
     grid-template-columns: 1fr;
   }
 }
