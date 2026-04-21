@@ -61,7 +61,7 @@ export function WeeklySchedule({
     }
 
     const nextTop = Math.max(
-      targetRow.getBoundingClientRect().top + window.scrollY - 190,
+      targetRow.getBoundingClientRect().top + window.scrollY - 76,
       0,
     );
     const behavior =

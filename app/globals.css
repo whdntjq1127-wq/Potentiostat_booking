@@ -533,7 +533,7 @@ button {
 
 .schedule-table thead th {
   position: sticky;
-  top: 92px;
+  top: 0;
   z-index: 42;
   background: #f7fbf9;
   color: var(--primary-strong);
@@ -542,7 +542,7 @@ button {
 }
 
 .schedule-table thead tr:nth-child(2) th {
-  top: 129px;
+  top: 37px;
   z-index: 41;
 }
 
