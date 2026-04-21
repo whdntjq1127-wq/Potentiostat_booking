@@ -100,49 +100,61 @@ export function WeeklySchedule({
         <table className="schedule-table">
           <thead>
             <tr>
-              <th className="corner-cell time-head">Time</th>
-              <th className="corner-cell channel-head">Channel</th>
+              <th className="corner-cell time-head" rowSpan={2}>
+                Time
+              </th>
               {weekDates.map((date) => (
-                <th key={toDateKey(date)}>{formatShortDateLabel(date)}</th>
+                <th
+                  key={toDateKey(date)}
+                  className="date-head"
+                  colSpan={CHANNELS.length}
+                >
+                  {formatShortDateLabel(date)}
+                </th>
               ))}
+            </tr>
+            <tr>
+              {weekDates.map((date) =>
+                CHANNELS.map((channel, channelIndex) => {
+                  const dateKey = toDateKey(date);
+                  const channelStyle = {
+                    '--channel-color': getChannelColor(channel),
+                    '--channel-color-soft': getChannelSoftColor(channel),
+                  } as CSSProperties;
+
+                  return (
+                    <th
+                      key={`${dateKey}-${channel}`}
+                      className={`channel-subhead ${
+                        channelIndex === CHANNELS.length - 1
+                          ? 'date-end-cell'
+                          : ''
+                      }`}
+                      style={channelStyle}
+                    >
+                      {channel}
+                    </th>
+                  );
+                }),
+              )}
             </tr>
           </thead>
           <tbody>
-            {hourGroups.map((group) =>
-              CHANNELS.map((channel, index) => (
-                <tr
-                  key={`${group.hour}-${channel}`}
-                  className={index === CHANNELS.length - 1 ? 'hour-group-end' : undefined}
-                  ref={
-                    index === 0
-                      ? (node) => {
-                          hourRowRefs.current[group.hour] = node;
-                        }
-                      : undefined
-                  }
-                >
-                  {(() => {
+            {hourGroups.map((group) => (
+              <tr
+                key={group.hour}
+                ref={(node) => {
+                  hourRowRefs.current[group.hour] = node;
+                }}
+              >
+                <th className="time-group-cell">{group.label}</th>
+
+                {weekDates.map((date) =>
+                  CHANNELS.map((channel, channelIndex) => {
                     const channelStyle = {
                       '--channel-color': getChannelColor(channel),
                       '--channel-color-soft': getChannelSoftColor(channel),
                     } as CSSProperties;
-
-                    return (
-                      <>
-                  {index === 0 ? (
-                    <th className="time-group-cell" rowSpan={CHANNELS.length}>
-                      {group.label}
-                    </th>
-                  ) : null}
-
-                  <th
-                    className="slot-label-cell"
-                    style={channelStyle}
-                  >
-                    <span>{channel}</span>
-                  </th>
-
-                  {weekDates.map((date) => {
                     const slotStart = setHour(date, group.hour);
                     const slotEnd = addHours(slotStart, 1);
                     const slotDateKey = toDateKey(slotStart);
@@ -192,8 +204,12 @@ export function WeeklySchedule({
 
                     return (
                       <td
-                        key={`${group.hour}-${channel}-${slotDateKey}`}
-                        className="slot-cell"
+                        key={`${group.hour}-${slotDateKey}-${channel}`}
+                        className={`slot-cell ${
+                          channelIndex === CHANNELS.length - 1
+                            ? 'date-end-cell'
+                            : ''
+                        }`}
                         style={channelStyle}
                       >
                         <button
@@ -214,23 +230,24 @@ export function WeeklySchedule({
                             visibleBooking
                               ? `${visibleBooking.applicant}'s booking`
                               : inBlockedDate
-                                  ? 'This date is blocked by the admin'
-                                  : inWindow
-                                    ? 'This slot cannot be selected'
-                                    : 'The start date is outside the booking window'
+                                ? 'This date is blocked by the admin'
+                                : inWindow
+                                  ? 'This slot cannot be selected'
+                                  : 'The start date is outside the booking window'
                           }
                         >
-                          {visibleBooking ? visibleBooking.applicant : selectable ? '' : '/'}
+                          {visibleBooking
+                            ? visibleBooking.applicant
+                            : selectable
+                              ? ''
+                              : '/'}
                         </button>
                       </td>
                     );
-                  })}
-                      </>
-                    );
-                  })()}
-                </tr>
-              )),
-            )}
+                  }),
+                )}
+              </tr>
+            ))}
           </tbody>
         </table>
       </div>

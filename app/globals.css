@@ -509,7 +509,7 @@ button {
 
 .schedule-table {
   width: 100%;
-  min-width: 1080px;
+  min-width: 1360px;
   border-collapse: separate;
   border-spacing: 0;
 }
@@ -524,6 +524,11 @@ button {
   box-shadow: inset 0 -1px 0 var(--line-strong);
 }
 
+.schedule-table thead tr:nth-child(2) th {
+  top: 38px;
+  z-index: 7;
+}
+
 .schedule-table th,
 .schedule-table td {
   border-bottom: 1px solid var(--line);
@@ -533,8 +538,7 @@ button {
 }
 
 .corner-cell,
-.time-group-cell,
-.slot-label-cell {
+.time-group-cell {
   position: sticky;
   z-index: 2;
   background: #f7fbf9;
@@ -551,13 +555,6 @@ button {
   width: 108px;
 }
 
-.channel-head,
-.slot-label-cell {
-  left: 108px;
-  min-width: 84px;
-  width: 84px;
-}
-
 .time-group-cell {
   padding: 6px 8px;
   text-align: center;
@@ -567,29 +564,31 @@ button {
   line-height: 1.2;
   vertical-align: middle;
   color: var(--primary-strong);
-  border-bottom: 3px double var(--line-strong);
 }
 
-.slot-label-cell {
-  padding: 6px 8px;
-  text-align: center;
+.date-head {
+  min-width: 156px;
+  padding: 11px 8px;
+  border-right: 2px solid var(--line-strong) !important;
+}
+
+.channel-subhead {
+  min-width: 52px;
+  width: 52px;
+  padding: 7px 6px;
   background: var(--channel-color, #f7fbf9);
   color: #15322a;
+  font-size: 0.74rem;
+  letter-spacing: 0.02em;
   box-shadow: none;
 }
 
-.slot-label-cell span {
-  display: block;
-  font-size: 0.78rem;
-}
-
-.schedule-table tr.hour-group-end td,
-.schedule-table tr.hour-group-end .slot-label-cell {
-  border-bottom: 3px double var(--line-strong);
+.date-end-cell {
+  border-right: 2px solid var(--line-strong) !important;
 }
 
 .slot-cell {
-  min-width: 108px;
+  min-width: 52px;
   background: var(--channel-color-soft, transparent);
 }
 
