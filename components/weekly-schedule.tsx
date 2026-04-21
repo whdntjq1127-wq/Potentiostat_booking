@@ -1,6 +1,6 @@
 'use client';
 
-import type { CSSProperties } from 'react';
+import { useEffect, useMemo, useRef, type CSSProperties } from 'react';
 import { useReservation } from './reservation-context';
 import {
   CHANNELS,
@@ -39,11 +39,39 @@ export function WeeklySchedule({
   onShiftWeek,
 }: WeeklyScheduleProps) {
   const { bookings, blockedDates, settings } = useReservation();
+  const scheduleWrapRef = useRef<HTMLDivElement | null>(null);
+  const hourRowRefs = useRef<Record<number, HTMLTableRowElement | null>>({});
+  const previousHourRef = useRef<number | null>(null);
   const weekDates = getWeekDates(anchorDate);
-  const hourGroups = Array.from({ length: 24 }, (_, hour) => ({
-    hour,
-    label: `${String(hour).padStart(2, '0')}:00~${String((hour + 1) % 24).padStart(2, '0')}:00`,
-  }));
+  const currentHour = now.getHours();
+  const hourGroups = useMemo(
+    () =>
+      Array.from({ length: 24 }, (_, hour) => ({
+        hour,
+        label: `${String(hour).padStart(2, '0')}:00~${String((hour + 1) % 24).padStart(2, '0')}:00`,
+      })),
+    [],
+  );
+
+  useEffect(() => {
+    const container = scheduleWrapRef.current;
+    const targetRow = hourRowRefs.current[currentHour];
+
+    if (!container || !targetRow) {
+      previousHourRef.current = currentHour;
+      return;
+    }
+
+    const headerHeight = container.querySelector('thead')?.clientHeight ?? 0;
+    const nextTop = Math.max(targetRow.offsetTop - headerHeight, 0);
+    const behavior =
+      previousHourRef.current === null || previousHourRef.current === currentHour
+        ? 'auto'
+        : 'smooth';
+
+    container.scrollTo({ top: nextTop, behavior });
+    previousHourRef.current = currentHour;
+  }, [anchorDate, currentHour]);
 
   return (
     <div className="schedule-shell">
@@ -68,7 +96,7 @@ export function WeeklySchedule({
         </button>
       </div>
 
-      <div className="schedule-wrap">
+      <div ref={scheduleWrapRef} className="schedule-wrap">
         <table className="schedule-table">
           <thead>
             <tr>
@@ -85,6 +113,13 @@ export function WeeklySchedule({
                 <tr
                   key={`${group.hour}-${channel}`}
                   className={index === CHANNELS.length - 1 ? 'hour-group-end' : undefined}
+                  ref={
+                    index === 0
+                      ? (node) => {
+                          hourRowRefs.current[group.hour] = node;
+                        }
+                      : undefined
+                  }
                 >
                   {(() => {
                     const channelStyle = {

@@ -42,10 +42,40 @@ export default function Home() {
   } | null>(null);
 
   useEffect(() => {
-    const current = new Date();
-    setNow(current);
-    setWeekAnchor(current);
-    setMounted(true);
+    let intervalId: number | null = null;
+    let timeoutId: number | null = null;
+
+    const syncNow = () => {
+      const current = new Date();
+      setNow(current);
+      setWeekAnchor((existing) => existing ?? current);
+      setMounted(true);
+    };
+
+    syncNow();
+
+    const startMinuteTimer = () => {
+      const current = new Date();
+      const delay =
+        (60 - current.getSeconds()) * 1000 - current.getMilliseconds();
+
+      timeoutId = window.setTimeout(() => {
+        syncNow();
+        intervalId = window.setInterval(syncNow, 60 * 1000);
+      }, delay);
+    };
+
+    startMinuteTimer();
+
+    return () => {
+      if (timeoutId !== null) {
+        window.clearTimeout(timeoutId);
+      }
+
+      if (intervalId !== null) {
+        window.clearInterval(intervalId);
+      }
+    };
   }, []);
 
   useEffect(() => {
