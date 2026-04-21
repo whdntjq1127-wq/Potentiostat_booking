@@ -9,15 +9,18 @@ import {
   type ReactNode,
 } from 'react';
 import {
+  addDays,
   buildBookingSummary,
   compareBookings,
   compareChangeLogs,
   createInitialReservationState,
   fromDateTimeLocal,
   getCoveredDateKeys,
+  getBookingExpiryDate,
   getLatestAllowedEnd,
   isStartWithinBookingWindow,
   overlaps,
+  pruneExpiredReservationState,
   type Booking,
   type Channel,
   type ChangeLogEntry,
@@ -132,6 +135,10 @@ function createLogEntry(
   action: ChangeLogEntry['action'],
   actor: string,
   summary: string,
+  options?: {
+    bookingId?: string;
+    expiresAt?: string;
+  },
 ): ChangeLogEntry {
   const now = new Date();
 
@@ -141,6 +148,8 @@ function createLogEntry(
     action,
     summary,
     createdAt: now.toISOString(),
+    bookingId: options?.bookingId,
+    expiresAt: options?.expiresAt,
   };
 }
 
@@ -154,18 +163,49 @@ export function ReservationProvider({ children }: { children: ReactNode }) {
     const stored = parseStoredState();
     if (stored) {
       const defaults = createInitialReservationState();
-      setSnapshot({
+      const migratedLogs = (stored.changeLogs ?? defaults.changeLogs).map((entry) => {
+        if (entry.expiresAt) {
+          return entry;
+        }
+
+        const linkedBooking = entry.bookingId
+          ? stored.bookings.find((booking) => booking.id === entry.bookingId)
+          : null;
+
+        return {
+          ...entry,
+          expiresAt: linkedBooking
+            ? getBookingExpiryDate(linkedBooking.endAt)?.toISOString()
+            : addDays(new Date(entry.createdAt), 7).toISOString(),
+        };
+      });
+
+      const nextSnapshot = {
         ...defaults,
         ...stored,
         bookings: [...stored.bookings].sort(compareBookings),
         blockedDates: stored.blockedDates ?? defaults.blockedDates,
         notices: stored.notices ?? defaults.notices,
         settings: stored.settings ?? defaults.settings,
-        changeLogs: [...(stored.changeLogs ?? [])].sort(compareChangeLogs),
-      });
+        changeLogs: [...migratedLogs].sort(compareChangeLogs),
+      };
+
+      setSnapshot(pruneExpiredReservationState(nextSnapshot));
     }
     setReady(true);
   }, []);
+
+  useEffect(() => {
+    if (!ready) {
+      return;
+    }
+
+    const interval = window.setInterval(() => {
+      setSnapshot((current) => pruneExpiredReservationState(current));
+    }, 60 * 60 * 1000);
+
+    return () => window.clearInterval(interval);
+  }, [ready]);
 
   useEffect(() => {
     if (!ready || typeof window === 'undefined') {
@@ -261,23 +301,31 @@ export function ReservationProvider({ children }: { children: ReactNode }) {
           createdAt: createdAt.toISOString(),
         };
 
-        setSnapshot((current) => ({
-          ...current,
-          bookings: [...current.bookings, newBooking].sort(compareBookings),
-          changeLogs: [
-            createLogEntry(
-              'booking_created',
-              trimmedApplicant,
-              buildBookingSummary({
-                channel,
-                startAt,
-                endAt,
-                purpose: trimmedPurpose,
-              }),
-            ),
-            ...current.changeLogs,
-          ].sort(compareChangeLogs),
-        }));
+        setSnapshot((current) => {
+          const base = pruneExpiredReservationState(current);
+
+          return {
+            ...base,
+            bookings: [...base.bookings, newBooking].sort(compareBookings),
+            changeLogs: [
+              createLogEntry(
+                'booking_created',
+                trimmedApplicant,
+                buildBookingSummary({
+                  channel,
+                  startAt,
+                  endAt,
+                  purpose: trimmedPurpose,
+                }),
+                {
+                  bookingId: newBooking.id,
+                  expiresAt: getBookingExpiryDate(endAt)?.toISOString(),
+                },
+              ),
+              ...base.changeLogs,
+            ].sort(compareChangeLogs),
+          };
+        });
 
         return {
           ok: true,
@@ -350,40 +398,48 @@ export function ReservationProvider({ children }: { children: ReactNode }) {
           };
         }
 
-        setSnapshot((current) => ({
-          ...current,
-          bookings: current.bookings
-            .map((booking) =>
-              booking.id === id
-                ? {
-                    ...booking,
-                    channel,
-                    startAt,
-                    endAt,
-                    purpose: purpose.trim(),
-                  }
-                : booking,
-            )
-            .sort(compareBookings),
-          changeLogs: [
-            createLogEntry(
-              'booking_updated',
-              requestedBy,
-              `${target.applicant} 예약 변경: ${buildBookingSummary({
-                channel: target.channel,
-                startAt: target.startAt,
-                endAt: target.endAt,
-                purpose: target.purpose,
-              })} -> ${buildBookingSummary({
-                channel,
-                startAt,
-                endAt,
-                purpose,
-              })}`,
-            ),
-            ...current.changeLogs,
-          ].sort(compareChangeLogs),
-        }));
+        setSnapshot((current) => {
+          const base = pruneExpiredReservationState(current);
+
+          return {
+            ...base,
+            bookings: base.bookings
+              .map((booking) =>
+                booking.id === id
+                  ? {
+                      ...booking,
+                      channel,
+                      startAt,
+                      endAt,
+                      purpose: purpose.trim(),
+                    }
+                  : booking,
+              )
+              .sort(compareBookings),
+            changeLogs: [
+              createLogEntry(
+                'booking_updated',
+                requestedBy,
+                `${target.applicant} 예약 변경: ${buildBookingSummary({
+                  channel: target.channel,
+                  startAt: target.startAt,
+                  endAt: target.endAt,
+                  purpose: target.purpose,
+                })} -> ${buildBookingSummary({
+                  channel,
+                  startAt,
+                  endAt,
+                  purpose,
+                })}`,
+                {
+                  bookingId: id,
+                  expiresAt: getBookingExpiryDate(endAt)?.toISOString(),
+                },
+              ),
+              ...base.changeLogs,
+            ].sort(compareChangeLogs),
+          };
+        });
 
         return {
           ok: true,
@@ -397,25 +453,33 @@ export function ReservationProvider({ children }: { children: ReactNode }) {
           return;
         }
 
-        setSnapshot((current) => ({
-          ...current,
-          bookings: current.bookings.map((booking) =>
-            booking.id === id ? { ...booking, status: 'cancelled' } : booking,
-          ),
-          changeLogs: [
-            createLogEntry(
-              'booking_cancelled',
-              requestedBy,
-              `${target.applicant} 예약 취소: ${buildBookingSummary({
-                channel: target.channel,
-                startAt: target.startAt,
-                endAt: target.endAt,
-                purpose: target.purpose,
-              })}`,
+        setSnapshot((current) => {
+          const base = pruneExpiredReservationState(current);
+
+          return {
+            ...base,
+            bookings: base.bookings.map((booking) =>
+              booking.id === id ? { ...booking, status: 'cancelled' } : booking,
             ),
-            ...current.changeLogs,
-          ].sort(compareChangeLogs),
-        }));
+            changeLogs: [
+              createLogEntry(
+                'booking_cancelled',
+                requestedBy,
+                `${target.applicant} 예약 취소: ${buildBookingSummary({
+                  channel: target.channel,
+                  startAt: target.startAt,
+                  endAt: target.endAt,
+                  purpose: target.purpose,
+                })}`,
+                {
+                  bookingId: id,
+                  expiresAt: getBookingExpiryDate(target.endAt)?.toISOString(),
+                },
+              ),
+              ...base.changeLogs,
+            ].sort(compareChangeLogs),
+          };
+        });
       },
       addBlockedDate: (date) => {
         const trimmed = date.trim();
@@ -427,28 +491,36 @@ export function ReservationProvider({ children }: { children: ReactNode }) {
           return { ok: false, message: '이미 차단된 날짜입니다.' };
         }
 
-        setSnapshot((current) => ({
-          ...current,
-          blockedDates: [...current.blockedDates, trimmed].sort(),
-          changeLogs: [
-            createLogEntry('blocked_date_added', '관리자', `${trimmed} 예약 차단`),
-            ...current.changeLogs,
-          ].sort(compareChangeLogs),
-        }));
+        setSnapshot((current) => {
+          const base = pruneExpiredReservationState(current);
+
+          return {
+            ...base,
+            blockedDates: [...base.blockedDates, trimmed].sort(),
+            changeLogs: [
+              createLogEntry('blocked_date_added', '관리자', `${trimmed} 예약 차단`),
+              ...base.changeLogs,
+            ].sort(compareChangeLogs),
+          };
+        });
 
         return { ok: true, message: `${trimmed}을 차단했습니다.` };
       },
       removeBlockedDate: (date) => {
-        setSnapshot((current) => ({
-          ...current,
-          blockedDates: current.blockedDates.filter(
-            (blockedDate) => blockedDate !== date,
-          ),
-          changeLogs: [
-            createLogEntry('blocked_date_removed', '관리자', `${date} 차단 해제`),
-            ...current.changeLogs,
-          ].sort(compareChangeLogs),
-        }));
+        setSnapshot((current) => {
+          const base = pruneExpiredReservationState(current);
+
+          return {
+            ...base,
+            blockedDates: base.blockedDates.filter(
+              (blockedDate) => blockedDate !== date,
+            ),
+            changeLogs: [
+              createLogEntry('blocked_date_removed', '관리자', `${date} 차단 해제`),
+              ...base.changeLogs,
+            ].sort(compareChangeLogs),
+          };
+        });
       },
       addNotice: (notice) => {
         const trimmed = notice.trim();
@@ -456,26 +528,34 @@ export function ReservationProvider({ children }: { children: ReactNode }) {
           return { ok: false, message: '공지 내용을 입력해 주세요.' };
         }
 
-        setSnapshot((current) => ({
-          ...current,
-          notices: [trimmed, ...current.notices],
-          changeLogs: [
-            createLogEntry('notice_added', '관리자', `공지 추가: ${trimmed}`),
-            ...current.changeLogs,
-          ].sort(compareChangeLogs),
-        }));
+        setSnapshot((current) => {
+          const base = pruneExpiredReservationState(current);
+
+          return {
+            ...base,
+            notices: [trimmed, ...base.notices],
+            changeLogs: [
+              createLogEntry('notice_added', '관리자', `공지 추가: ${trimmed}`),
+              ...base.changeLogs,
+            ].sort(compareChangeLogs),
+          };
+        });
 
         return { ok: true, message: '공지사항을 추가했습니다.' };
       },
       removeNotice: (notice) => {
-        setSnapshot((current) => ({
-          ...current,
-          notices: current.notices.filter((item) => item !== notice),
-          changeLogs: [
-            createLogEntry('notice_removed', '관리자', `공지 삭제: ${notice}`),
-            ...current.changeLogs,
-          ].sort(compareChangeLogs),
-        }));
+        setSnapshot((current) => {
+          const base = pruneExpiredReservationState(current);
+
+          return {
+            ...base,
+            notices: base.notices.filter((item) => item !== notice),
+            changeLogs: [
+              createLogEntry('notice_removed', '관리자', `공지 삭제: ${notice}`),
+              ...base.changeLogs,
+            ].sort(compareChangeLogs),
+          };
+        });
       },
       updateSettings: (next) => {
         if (
@@ -493,21 +573,25 @@ export function ReservationProvider({ children }: { children: ReactNode }) {
           return { ok: false, message: '최대 사용 기간은 1일 이상이어야 합니다.' };
         }
 
-        setSnapshot((current) => ({
-          ...current,
-          settings: {
-            bookingWindowDays: Math.floor(next.bookingWindowDays),
-            maxDurationDays: Math.floor(next.maxDurationDays),
-          },
-          changeLogs: [
-            createLogEntry(
-              'settings_updated',
-              '관리자',
-              `예약 시작 가능 범위 ${Math.floor(next.bookingWindowDays)}일, 최대 사용 기간 ${Math.floor(next.maxDurationDays)}일로 변경`,
-            ),
-            ...current.changeLogs,
-          ].sort(compareChangeLogs),
-        }));
+        setSnapshot((current) => {
+          const base = pruneExpiredReservationState(current);
+
+          return {
+            ...base,
+            settings: {
+              bookingWindowDays: Math.floor(next.bookingWindowDays),
+              maxDurationDays: Math.floor(next.maxDurationDays),
+            },
+            changeLogs: [
+              createLogEntry(
+                'settings_updated',
+                '관리자',
+                `예약 시작 가능 범위 ${Math.floor(next.bookingWindowDays)}일, 최대 사용 기간 ${Math.floor(next.maxDurationDays)}일로 변경`,
+              ),
+              ...base.changeLogs,
+            ].sort(compareChangeLogs),
+          };
+        });
 
         return { ok: true, message: '예약 규칙을 저장했습니다.' };
       },

@@ -82,7 +82,10 @@ export function WeeklySchedule({
           <tbody>
             {hourGroups.map((group) =>
               CHANNELS.map((channel, index) => (
-                <tr key={`${group.hour}-${channel}`}>
+                <tr
+                  key={`${group.hour}-${channel}`}
+                  className={index === CHANNELS.length - 1 ? 'hour-group-end' : undefined}
+                >
                   {(() => {
                     const channelStyle = {
                       '--channel-color': getChannelColor(channel),

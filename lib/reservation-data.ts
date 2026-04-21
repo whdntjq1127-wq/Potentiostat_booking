@@ -37,6 +37,8 @@ export type ChangeLogEntry = {
   action: ChangeAction;
   summary: string;
   createdAt: string;
+  bookingId?: string;
+  expiresAt?: string;
 };
 
 export type ReservationSettings = {
@@ -246,6 +248,70 @@ export function getLatestAllowedEnd(
   return addHours(start, settings.maxDurationDays * 24);
 }
 
+export function getBookingExpiryDate(endAt: string) {
+  const end = fromDateTimeLocal(endAt);
+
+  if (!end) {
+    return null;
+  }
+
+  return addDays(startOfDay(end), 7);
+}
+
+export function pruneExpiredReservationState(
+  snapshot: ReservationSnapshot,
+  now = new Date(),
+) {
+  const today = startOfDay(now);
+  const activeBookings = snapshot.bookings.filter((booking) => {
+    const expiresAt = getBookingExpiryDate(booking.endAt);
+
+    if (!expiresAt) {
+      return true;
+    }
+
+    return expiresAt > today;
+  });
+
+  const removedBookingIds = new Set(
+    snapshot.bookings
+      .filter(
+        (booking) => !activeBookings.some((active) => active.id === booking.id),
+      )
+      .map((booking) => booking.id),
+  );
+
+  const activeLogs = snapshot.changeLogs.filter((entry) => {
+    if (entry.bookingId && removedBookingIds.has(entry.bookingId)) {
+      return false;
+    }
+
+    if (!entry.expiresAt) {
+      return true;
+    }
+
+    const expiresAt = new Date(entry.expiresAt);
+    if (Number.isNaN(expiresAt.getTime())) {
+      return true;
+    }
+
+    return startOfDay(expiresAt) > today;
+  });
+
+  if (
+    activeBookings.length === snapshot.bookings.length &&
+    activeLogs.length === snapshot.changeLogs.length
+  ) {
+    return snapshot;
+  }
+
+  return {
+    ...snapshot,
+    bookings: activeBookings.sort(compareBookings),
+    changeLogs: activeLogs.sort(compareChangeLogs),
+  };
+}
+
 export function compareBookings(a: Booking, b: Booking) {
   return a.startAt.localeCompare(b.startAt);
 }
@@ -343,6 +409,10 @@ export function createInitialReservationState(
           purpose: '전극 안정성 측정',
         }),
         createdAt: addHours(base, 9).toISOString(),
+        bookingId: 'bk-001',
+        expiresAt: getBookingExpiryDate(
+          toDateTimeLocal(addHours(firstBookingStart, 1)),
+        )?.toISOString(),
       },
       {
         id: 'log-002',
@@ -355,6 +425,10 @@ export function createInitialReservationState(
           purpose: '임피던스 비교 실험',
         }),
         createdAt: addHours(base, 11).toISOString(),
+        bookingId: 'bk-002',
+        expiresAt: getBookingExpiryDate(
+          toDateTimeLocal(addHours(secondBookingStart, 1)),
+        )?.toISOString(),
       },
     ],
     bookings: bookings.sort(compareBookings),

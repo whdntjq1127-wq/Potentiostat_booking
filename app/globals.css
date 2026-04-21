@@ -556,9 +556,13 @@ button {
 .time-group-cell {
   padding: 6px 8px;
   text-align: center;
-  font-size: 0.76rem;
+  font-size: 0.96rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  line-height: 1.2;
   vertical-align: middle;
   color: var(--primary-strong);
+  border-bottom: 3px double var(--line-strong);
 }
 
 .slot-label-cell {
@@ -572,6 +576,11 @@ button {
 .slot-label-cell span {
   display: block;
   font-size: 0.78rem;
+}
+
+.schedule-table tr.hour-group-end td,
+.schedule-table tr.hour-group-end .slot-label-cell {
+  border-bottom: 3px double var(--line-strong);
 }
 
 .slot-cell {
