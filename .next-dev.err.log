@@ -1,0 +1,57 @@
+ ⨯ ./components/weekly-schedule.tsx
+Error:   [31mx[0m Unexpected token `div`. Expected jsx identifier
+    ,-[[36;1;4mC:\Users\JWS\Documents\GitHub\Potentiostat_booking\components\weekly-schedule.tsx[0m:77:1]
+ [2m74[0m |   }, [anchorDate, currentHour]);
+ [2m75[0m | 
+ [2m76[0m |   return (
+ [2m77[0m |     <div className="schedule-shell">
+    : [35;1m     ^^^[0m
+ [2m78[0m |       <div className="week-toolbar">
+ [2m79[0m |         <button
+ [2m80[0m |           type="button"
+    `----
+
+Caused by:
+    Syntax Error
+
+Import trace for requested module:
+./components/weekly-schedule.tsx
+./app/page.tsx
+ ⨯ ./components/weekly-schedule.tsx
+Error:   [31mx[0m Unexpected token `div`. Expected jsx identifier
+    ,-[[36;1;4mC:\Users\JWS\Documents\GitHub\Potentiostat_booking\components\weekly-schedule.tsx[0m:77:1]
+ [2m74[0m |   }, [anchorDate, currentHour]);
+ [2m75[0m | 
+ [2m76[0m |   return (
+ [2m77[0m |     <div className="schedule-shell">
+    : [35;1m     ^^^[0m
+ [2m78[0m |       <div className="week-toolbar">
+ [2m79[0m |         <button
+ [2m80[0m |           type="button"
+    `----
+
+Caused by:
+    Syntax Error
+
+Import trace for requested module:
+./components/weekly-schedule.tsx
+./app/page.tsx
+ ⨯ ./components/weekly-schedule.tsx
+Error:   [31mx[0m Unexpected token `div`. Expected jsx identifier
+    ,-[[36;1;4mC:\Users\JWS\Documents\GitHub\Potentiostat_booking\components\weekly-schedule.tsx[0m:77:1]
+ [2m74[0m |   }, [anchorDate, currentHour]);
+ [2m75[0m | 
+ [2m76[0m |   return (
+ [2m77[0m |     <div className="schedule-shell">
+    : [35;1m     ^^^[0m
+ [2m78[0m |       <div className="week-toolbar">
+ [2m79[0m |         <button
+ [2m80[0m |           type="button"
+    `----
+
+Caused by:
+    Syntax Error
+
+Import trace for requested module:
+./components/weekly-schedule.tsx
+./app/page.tsx

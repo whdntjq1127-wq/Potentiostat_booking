@@ -72,7 +72,7 @@ export default function MyBookingsPage() {
         </p>
         <p className="muted">
           Booking creation, edits, and cancellations are all recorded in the public
-          logbook on the main page.
+          logbook under Booking Change History.
         </p>
 
         <div className="lookup-bar section">

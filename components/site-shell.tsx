@@ -7,6 +7,7 @@ import type { ReactNode } from 'react';
 const navItems = [
   { href: '/', label: 'Weekly Board' },
   { href: '/my-bookings', label: 'My Bookings' },
+  { href: '/change-history', label: 'Booking Change History' },
   { href: '/admin', label: 'Admin Settings' },
 ];
 

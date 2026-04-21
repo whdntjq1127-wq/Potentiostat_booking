@@ -9,7 +9,6 @@ import {
   formatDateLabel,
   formatDateTimeLabel,
   formatDisplayTime,
-  getChangeActionLabel,
   getLatestBookableDate,
   addHours,
   formatShortDateLabel,
@@ -27,7 +26,7 @@ type EndOption = {
 };
 
 export default function Home() {
-  const { ready, addBooking, bookings, blockedDates, changeLogs, settings } =
+  const { ready, addBooking, bookings, blockedDates, settings } =
     useReservation();
   const [mounted, setMounted] = useState(false);
   const [now, setNow] = useState<Date | null>(null);
@@ -173,8 +172,6 @@ export default function Home() {
   const endTimeOptions = availableEndOptions.filter(
     (option) => option.dateKey === selectedEndDate,
   );
-  const recentLogs = changeLogs.slice(0, 12);
-
   return (
     <main className="calendar-page">
       <section className="panel board-panel calendar-panel">
@@ -215,37 +212,6 @@ export default function Home() {
               )
             }
           />
-      </section>
-
-      <section className="panel">
-        <div className="section-head">
-          <div>
-            <div className="eyebrow">Public Logbook</div>
-            <h2 className="section-title">Booking Change History</h2>
-          </div>
-          <div className="muted">
-            Booking creation, edits, cancellations, and admin changes are all recorded.
-          </div>
-        </div>
-
-        <div className="logbook-list section">
-          {recentLogs.length === 0 ? (
-            <div className="empty-state">No changes have been recorded yet.</div>
-          ) : (
-            recentLogs.map((entry) => (
-              <article key={entry.id} className="log-entry">
-                <div className="card-head">
-                  <div className="log-meta">
-                    <span className="log-actor">{entry.actor}</span>
-                    <span className="muted">{formatDateTimeLabel(entry.createdAt)}</span>
-                  </div>
-                  <span className="chip">{getChangeActionLabel(entry.action)}</span>
-                </div>
-                <div>{entry.summary}</div>
-              </article>
-            ))
-          )}
-        </div>
       </section>
 
       {selectedSlot ? (
