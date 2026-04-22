@@ -311,10 +311,10 @@ export default function Home() {
 
             <form
               className="form-grid section"
-              onSubmit={(event) => {
+              onSubmit={async (event) => {
                 event.preventDefault();
 
-                const result = addBookings({
+                const result = await addBookings({
                   applicant,
                   channels: selectedChannels,
                   startAt: selectedSlot.startAt,

@@ -138,12 +138,13 @@ export default function MyBookingsPage() {
                     <button
                       type="button"
                       className="button-danger"
-                      onClick={() =>
-                        cancelBooking({
+                      onClick={async () => {
+                        const result = await cancelBooking({
                           id: booking.id,
                           requestedBy: query.trim() || booking.applicant,
-                        })
-                      }
+                        });
+                        setEditMessage(result.message);
+                      }}
                     >
                       Cancel Booking
                     </button>
@@ -153,9 +154,9 @@ export default function MyBookingsPage() {
                 {editingId === booking.id && editDraft ? (
                   <form
                     className="form-grid section edit-form"
-                    onSubmit={(event) => {
+                    onSubmit={async (event) => {
                       event.preventDefault();
-                      const result = updateBooking({
+                      const result = await updateBooking({
                         id: booking.id,
                         requestedBy: query.trim() || booking.applicant,
                         channel: editDraft.channel,

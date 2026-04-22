@@ -71,10 +71,10 @@ export function BookingForm({
 
       <form
         className="form-grid section"
-        onSubmit={(event) => {
+        onSubmit={async (event) => {
           event.preventDefault();
 
-          const result = addBooking(draft);
+          const result = await addBooking(draft);
           setMessage({ ok: result.ok, text: result.message });
 
           if (result.ok) {

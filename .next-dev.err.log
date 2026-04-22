@@ -73,3 +73,20 @@ Caused by:
 Import trace for requested module:
 ./components/reservation-context.tsx
 ./app/page.tsx
+ ⨯ ./components/reservation-context.tsx
+Error: Failed to read source code from C:\Users\JWS\Documents\GitHub\Potentiostat_booking\components\reservation-context.tsx
+
+Caused by:
+    지정된 파일을 찾을 수 없습니다. (os error 2)
+
+Import trace for requested module:
+./components/reservation-context.tsx
+ ⨯ ./components/reservation-context.tsx
+Error: Failed to read source code from C:\Users\JWS\Documents\GitHub\Potentiostat_booking\components\reservation-context.tsx
+
+Caused by:
+    지정된 파일을 찾을 수 없습니다. (os error 2)
+
+Import trace for requested module:
+./components/reservation-context.tsx
+./app/page.tsx

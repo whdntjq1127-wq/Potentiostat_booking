@@ -2,6 +2,24 @@
 
 This is a Next.js template which can be deployed to [Render](https://render.com).
 
+## Shared Booking Data
+
+The app now uses server API routes instead of browser `localStorage`. For real
+multi-user operation, connect it to Supabase PostgreSQL:
+
+1. Create a Supabase project.
+1. Open the Supabase SQL editor and run `database/schema.sql`.
+1. Copy `.env.example` to `.env.local` for local development.
+1. Set these environment variables in local and production environments:
+
+- `SUPABASE_URL`: your Supabase project URL.
+- `SUPABASE_SERVICE_ROLE_KEY`: server-only key used by Next.js API routes.
+- `ADMIN_PASSWORD`: password for the admin page.
+- `ADMIN_SESSION_SECRET`: random secret used to sign the admin cookie.
+
+If Supabase variables are missing, the app falls back to an in-memory development
+store. That fallback is not durable and should not be used for production.
+
 ## Deploying to Render
 
 This template can be used to deploy your Next.js application as a Node.js server.
@@ -27,6 +45,9 @@ Note: The button uses the `render.yaml` file in this repo to deploy your app. Fo
 - Runtime: Node
 - Build Command: `pnpm install; pnpm build`
 - Start Command: `pnpm start`
+
+Add the environment variables from `.env.example` in the Render dashboard before
+using the site with multiple users.
 
 ## Learn More
 To learn more about deploying Next.js, take a look at the following resources:

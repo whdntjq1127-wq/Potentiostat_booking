@@ -9,9 +9,6 @@ import {
   toDateKey,
 } from '../../lib/reservation-data';
 
-const ADMIN_PASSWORD = '001127';
-const ADMIN_SESSION_KEY = 'potentiostat-admin-auth';
-
 export default function AdminPage() {
   const {
     ready,
@@ -32,8 +29,10 @@ export default function AdminPage() {
   const [blockedMessage, setBlockedMessage] = useState<string | null>(null);
   const [noticeInput, setNoticeInput] = useState('');
   const [noticeMessage, setNoticeMessage] = useState<string | null>(null);
+  const [bookingMessage, setBookingMessage] = useState<string | null>(null);
   const [passwordInput, setPasswordInput] = useState('');
   const [authMessage, setAuthMessage] = useState<string | null>(null);
+  const [authChecked, setAuthChecked] = useState(false);
   const [authenticated, setAuthenticated] = useState(false);
 
   useEffect(() => {
@@ -42,14 +41,22 @@ export default function AdminPage() {
   }, [settings]);
 
   useEffect(() => {
-    if (typeof window === 'undefined') {
-      return;
+    async function checkAdminSession() {
+      try {
+        const response = await fetch('/api/admin/status', { cache: 'no-store' });
+        const data = (await response.json()) as { authenticated?: boolean };
+        setAuthenticated(!!data.authenticated);
+      } catch {
+        setAuthenticated(false);
+      } finally {
+        setAuthChecked(true);
+      }
     }
 
-    setAuthenticated(window.sessionStorage.getItem(ADMIN_SESSION_KEY) === 'yes');
+    void checkAdminSession();
   }, []);
 
-  if (!ready) {
+  if (!ready || !authChecked) {
     return (
       <main>
         <section className="panel">
@@ -68,20 +75,24 @@ export default function AdminPage() {
           <h1 className="section-title">Enter the password to open admin settings.</h1>
           <form
             className="section admin-gate-form"
-            onSubmit={(event) => {
+            onSubmit={async (event) => {
               event.preventDefault();
 
-              if (passwordInput === ADMIN_PASSWORD) {
-                if (typeof window !== 'undefined') {
-                  window.sessionStorage.setItem(ADMIN_SESSION_KEY, 'yes');
-                }
+              const response = await fetch('/api/admin/login', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ password: passwordInput }),
+              });
+
+              if (response.ok) {
                 setAuthenticated(true);
                 setAuthMessage(null);
                 setPasswordInput('');
                 return;
               }
 
-              setAuthMessage('The password is incorrect.');
+              const data = (await response.json()) as { message?: string };
+              setAuthMessage(data.message ?? 'The password is incorrect.');
             }}
           >
             <input
@@ -115,10 +126,8 @@ export default function AdminPage() {
           <button
             type="button"
             className="button-ghost"
-            onClick={() => {
-              if (typeof window !== 'undefined') {
-                window.sessionStorage.removeItem(ADMIN_SESSION_KEY);
-              }
+            onClick={async () => {
+              await fetch('/api/admin/logout', { method: 'POST' });
               setAuthenticated(false);
             }}
           >
@@ -128,9 +137,9 @@ export default function AdminPage() {
 
         <form
           className="form-grid section"
-          onSubmit={(event) => {
+          onSubmit={async (event) => {
             event.preventDefault();
-            const result = updateSettings(settingsDraft);
+            const result = await updateSettings(settingsDraft);
             setSettingsMessage(result.message);
           }}
         >
@@ -182,9 +191,9 @@ export default function AdminPage() {
           <h2 className="section-title">Unavailable Dates</h2>
           <form
             className="form-grid section"
-            onSubmit={(event) => {
+            onSubmit={async (event) => {
               event.preventDefault();
-              const result = addBlockedDate(blockedDateInput);
+              const result = await addBlockedDate(blockedDateInput);
               setBlockedMessage(result.message);
             }}
           >
@@ -213,7 +222,10 @@ export default function AdminPage() {
                   key={date}
                   type="button"
                   className="chip removable-chip"
-                  onClick={() => removeBlockedDate(date)}
+                  onClick={async () => {
+                    const result = await removeBlockedDate(date);
+                    setBlockedMessage(result.message);
+                  }}
                 >
                   Remove {date}
                 </button>
@@ -227,9 +239,9 @@ export default function AdminPage() {
           <h2 className="section-title">Operation Notes</h2>
           <form
             className="section"
-            onSubmit={(event) => {
+            onSubmit={async (event) => {
               event.preventDefault();
-              const result = addNotice(noticeInput);
+              const result = await addNotice(noticeInput);
               setNoticeMessage(result.message);
               if (result.ok) {
                 setNoticeInput('');
@@ -259,7 +271,10 @@ export default function AdminPage() {
                 <button
                   type="button"
                   className="button-ghost"
-                  onClick={() => removeNotice(notice)}
+                  onClick={async () => {
+                    const result = await removeNotice(notice);
+                    setNoticeMessage(result.message);
+                  }}
                 >
                   Delete
                 </button>
@@ -272,6 +287,9 @@ export default function AdminPage() {
       <section className="panel">
         <div className="eyebrow">Current Bookings</div>
         <h2 className="section-title">Registered Booking List</h2>
+        {bookingMessage ? (
+          <div className="inline-message section">{bookingMessage}</div>
+        ) : null}
         <div className="reservation-list section">
           {bookings.map((booking) => (
             <article
@@ -305,12 +323,13 @@ export default function AdminPage() {
                   <button
                     type="button"
                     className="button-warning"
-                    onClick={() =>
-                      cancelBooking({
+                    onClick={async () => {
+                      const result = await cancelBooking({
                         id: booking.id,
                         requestedBy: 'Admin',
-                      })
-                    }
+                      });
+                      setBookingMessage(result.message);
+                    }}
                   >
                     Admin Cancel
                   </button>
