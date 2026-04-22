@@ -3,7 +3,8 @@
   "scripts": {
     "dev": "next dev --turbo",
     "build": "next build",
-    "start": "next start"
+    "start": "next start",
+    "verify:persistence": "next build && node scripts/verify-persistence.mjs"
   },
   "dependencies": {
     "react": "19.0.0-rc-69d4b800-20241021",

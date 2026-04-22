@@ -45,6 +45,18 @@ Important: Render persistent disks require a paid web service plan. Free Render
 web services have an ephemeral filesystem. The app will still work by writing a
 local JSON file, but that file can be lost on deploy, restart, and spin-down.
 
+### Verify persistence locally
+
+Run this command before deploying storage changes:
+
+```bash
+pnpm verify:persistence
+```
+
+The check builds the app, starts the production server with a temporary JSON
+store, creates a test booking, restarts the server, and confirms that the same
+booking is still returned by `/api/reservations`.
+
 ## Deploying to Render
 
 This template can be used to deploy your Next.js application as a Node.js server.

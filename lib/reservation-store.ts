@@ -85,9 +85,14 @@ declare global {
   var __potentiostatReservationSnapshot: ReservationSnapshot | undefined;
 }
 
-let fileStoreQueue: Promise<void> = Promise.resolve();
-
 const RENDER_DISK_STORE_FILE = '/var/data/reservations.json';
+
+let cachedStore:
+  | {
+      key: string;
+      store: ReservationStore;
+    }
+  | undefined;
 
 function getMemorySnapshot() {
   if (!globalThis.__potentiostatReservationSnapshot) {
@@ -167,15 +172,6 @@ function isMissingFileError(error: unknown) {
     'code' in error &&
     error.code === 'ENOENT'
   );
-}
-
-function queueFileStoreTask<T>(task: () => Promise<T>) {
-  const nextTask = fileStoreQueue.then(task, task);
-  fileStoreQueue = nextTask.then(
-    () => undefined,
-    () => undefined,
-  );
-  return nextTask;
 }
 
 function getDefaultProductionStoreFile() {
@@ -284,9 +280,19 @@ class MemoryReservationStore implements ReservationStore {
 
 class FileReservationStore implements ReservationStore {
   private readonly filePath: string;
+  private queue: Promise<void> = Promise.resolve();
 
   constructor(filePath: string) {
     this.filePath = filePath;
+  }
+
+  private queueTask<T>(task: () => Promise<T>) {
+    const nextTask = this.queue.then(task, task);
+    this.queue = nextTask.then(
+      () => undefined,
+      () => undefined,
+    );
+    return nextTask;
   }
 
   private async readSnapshotFile() {
@@ -314,7 +320,7 @@ class FileReservationStore implements ReservationStore {
   private async updateSnapshot(
     updater: (current: ReservationSnapshot) => ReservationSnapshot,
   ) {
-    await queueFileStoreTask(async () => {
+    await this.queueTask(async () => {
       const current = pruneExpiredReservationState(await this.readSnapshotFile());
       await this.writeSnapshotFile(updater(current));
     });
@@ -322,7 +328,7 @@ class FileReservationStore implements ReservationStore {
   }
 
   async readSnapshot() {
-    return queueFileStoreTask(async () => {
+    return this.queueTask(async () => {
       const current = await this.readSnapshotFile();
       const pruned = pruneExpiredReservationState(current);
       await this.writeSnapshotFile(pruned);
@@ -620,14 +626,27 @@ export function getReservationStore(): ReservationStore {
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
   const filePath =
     process.env.RESERVATION_STORE_FILE?.trim() || getDefaultProductionStoreFile();
+  const key =
+    supabaseUrl && serviceKey
+      ? `supabase:${supabaseUrl}`
+      : filePath
+        ? `file:${filePath}`
+        : 'memory';
+
+  if (cachedStore?.key === key) {
+    return cachedStore.store;
+  }
+
+  let store: ReservationStore;
 
   if (supabaseUrl && serviceKey) {
-    return new SupabaseReservationStore(supabaseUrl, serviceKey);
+    store = new SupabaseReservationStore(supabaseUrl, serviceKey);
+  } else if (filePath) {
+    store = new FileReservationStore(filePath);
+  } else {
+    store = new MemoryReservationStore();
   }
 
-  if (filePath) {
-    return new FileReservationStore(filePath);
-  }
-
-  return new MemoryReservationStore();
+  cachedStore = { key, store };
+  return store;
 }
