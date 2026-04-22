@@ -3,16 +3,19 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import type { ReactNode } from 'react';
+import { languageOptions } from '../lib/i18n';
+import { useLanguage } from './language-context';
 
 const navItems = [
-  { href: '/', label: 'Weekly Board' },
-  { href: '/my-bookings', label: 'My Bookings' },
-  { href: '/change-history', label: 'Booking Change History' },
-  { href: '/admin', label: 'Admin Settings' },
-];
+  { href: '/', labelKey: 'weekly' },
+  { href: '/my-bookings', labelKey: 'myBookings' },
+  { href: '/change-history', labelKey: 'history' },
+  { href: '/admin', labelKey: 'admin' },
+] as const;
 
 export function SiteShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
+  const { copy, language, setLanguage } = useLanguage();
 
   return (
     <div className="shell">
@@ -20,28 +23,43 @@ export function SiteShell({ children }: { children: ReactNode }) {
         <div className="brand">
           <div className="brand-mark">PS</div>
           <div className="brand-copy">
-            <strong>Potentiostat Booking Board</strong>
-            <span>CH 1, CH 2, CH 3 integrated booking demo</span>
+            <strong>{copy.site.brandTitle}</strong>
+            <span>{copy.site.brandSubtitle}</span>
           </div>
         </div>
-        <nav className="nav-links" aria-label="Primary navigation">
-          {navItems.map((item) => (
-            <Link
-              key={item.href}
-              className="nav-link"
-              href={item.href}
-              aria-current={pathname === item.href ? 'page' : undefined}
+        <div className="nav-controls">
+          <nav className="nav-links" aria-label="Primary navigation">
+            {navItems.map((item) => (
+              <Link
+                key={item.href}
+                className="nav-link"
+                href={item.href}
+                aria-current={pathname === item.href ? 'page' : undefined}
+              >
+                {copy.site.nav[item.labelKey]}
+              </Link>
+            ))}
+          </nav>
+          <label className="language-picker">
+            <span>{copy.site.languageLabel}</span>
+            <select
+              value={language}
+              aria-label={copy.site.languageAriaLabel}
+              onChange={(event) =>
+                setLanguage(event.target.value === 'ko' ? 'ko' : 'en')
+              }
             >
-              {item.label}
-            </Link>
-          ))}
-        </nav>
+              {languageOptions.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
       </header>
       <div className="page">{children}</div>
-      <div className="footer-note">
-        This is a browser-only demo. There is no login, and admin rules are stored
-        only in the current browser.
-      </div>
+      <div className="footer-note">{copy.site.footer}</div>
     </div>
   );
 }

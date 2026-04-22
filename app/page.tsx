@@ -2,20 +2,23 @@
 
 import { useEffect, useMemo, useState, type CSSProperties } from 'react';
 import Link from 'next/link';
+import {
+  formatDateLabelForLanguage,
+  formatDateTimeLabelForLanguage,
+  formatShortDateLabelForLanguage,
+} from '../lib/i18n';
+import { useLanguage } from '../components/language-context';
 import { useReservation } from '../components/reservation-context';
 import { WeeklySchedule, type SelectedSlot } from '../components/weekly-schedule';
 import {
   CHANNELS,
   addDays,
-  formatDateLabel,
-  formatDateTimeLabel,
   formatDisplayTime,
   findActiveBookingConflict,
   getBlockedDateInRange,
   getChannelColor,
   getLatestBookableDate,
   addHours,
-  formatShortDateLabel,
   getLatestAllowedEnd,
   toDateKey,
   type Channel,
@@ -31,6 +34,7 @@ type EndOption = {
 export default function Home() {
   const { ready, addBookings, bookings, blockedDates, settings } =
     useReservation();
+  const { copy, language } = useLanguage();
   const [mounted, setMounted] = useState(false);
   const [now, setNow] = useState<Date | null>(null);
   const [weekAnchor, setWeekAnchor] = useState<Date | null>(null);
@@ -127,13 +131,13 @@ export default function Home() {
       options.push({
         value: `${toDateKey(candidate)}T${String(candidate.getHours()).padStart(2, '0')}:00`,
         dateKey: toDateKey(candidate),
-        dateLabel: formatShortDateLabel(candidate),
+        dateLabel: formatShortDateLabelForLanguage(candidate, language),
         timeLabel: formatDisplayTime(candidate),
       });
     }
 
     return options;
-  }, [blockedDates, bookings, selectedSlot, settings]);
+  }, [blockedDates, bookings, language, selectedSlot, settings]);
 
   useEffect(() => {
     if (!selectedSlot) {
@@ -205,8 +209,8 @@ export default function Home() {
     return (
       <main>
         <section className="panel">
-          <div className="eyebrow">Loading</div>
-          <h1 className="section-title">Preparing the weekly booking board.</h1>
+          <div className="eyebrow">{copy.home.loadingEyebrow}</div>
+          <h1 className="section-title">{copy.home.loadingTitle}</h1>
         </section>
       </main>
     );
@@ -223,7 +227,9 @@ export default function Home() {
   );
   const selectedChannelSet = new Set(selectedChannels);
   const selectedChannelLabel =
-    selectedChannels.length > 0 ? selectedChannels.join(', ') : 'No channel selected';
+    selectedChannels.length > 0
+      ? selectedChannels.join(', ')
+      : copy.home.noChannelSelected;
   const canSaveBooking = selectedChannels.length > 0 && !!endAt;
   const toggleChannel = (channel: Channel) => {
     const availability = channelAvailability.find(
@@ -246,17 +252,21 @@ export default function Home() {
       <section className="panel board-panel calendar-panel">
           <div className="section-head">
             <div>
-              <div className="eyebrow">Weekly Calendar</div>
-              <h2 className="section-title">7-Day Booking Status</h2>
+              <div className="eyebrow">{copy.home.weeklyEyebrow}</div>
+              <h2 className="section-title">{copy.home.weeklyTitle}</h2>
             </div>
             <div className="rule-summary">
-              <span>As of {formatDateLabel(now)}</span>
               <span>
-                Last start date: {formatDateLabel(latestBookableDate)}
+                {copy.home.asOf(formatDateLabelForLanguage(now, language))}
               </span>
-              <span>Booking unit: 1-hour increments</span>
               <span>
-                <Link href="/my-bookings">View My Bookings</Link>
+                {copy.home.lastStartDate(
+                  formatDateLabelForLanguage(latestBookableDate, language),
+                )}
+              </span>
+              <span>{copy.home.bookingUnit}</span>
+              <span>
+                <Link href="/my-bookings">{copy.home.viewMyBookings}</Link>
               </span>
             </div>
           </div>
@@ -291,22 +301,31 @@ export default function Home() {
           >
             <div className="section-head">
               <div>
-                <div className="eyebrow">Create Booking</div>
-                <h2 className="section-title">Book the Selected Slot</h2>
+                <div className="eyebrow">{copy.home.createEyebrow}</div>
+                <h2 className="section-title">{copy.home.createTitle}</h2>
               </div>
               <button
                 type="button"
                 className="button-ghost"
                 onClick={() => setSelectedSlot(null)}
               >
-                Close
+                {copy.home.close}
               </button>
             </div>
 
             <div className="selection-card modal-selection">
               <strong>{selectedChannelLabel}</strong>
-              <span>Start: {formatDateTimeLabel(selectedSlot.startAt)}</span>
-              <span>End: {formatDateTimeLabel(endAt || selectedSlot.endAt)}</span>
+              <span>
+                {copy.home.start}:{' '}
+                {formatDateTimeLabelForLanguage(selectedSlot.startAt, language)}
+              </span>
+              <span>
+                {copy.home.end}:{' '}
+                {formatDateTimeLabelForLanguage(
+                  endAt || selectedSlot.endAt,
+                  language,
+                )}
+              </span>
             </div>
 
             <form
@@ -334,19 +353,19 @@ export default function Home() {
               }}
             >
               <div className="field full">
-                <label htmlFor="modal-applicant">User Name</label>
+                <label htmlFor="modal-applicant">{copy.home.userName}</label>
                 <input
                   id="modal-applicant"
                   type="text"
                   value={applicant}
                   onChange={(event) => setApplicant(event.target.value)}
-                  placeholder="e.g. Dr. Kim"
+                  placeholder={copy.home.applicantPlaceholder}
                   required
                 />
               </div>
 
               <div className="field full">
-                <label>Channels</label>
+                <label>{copy.home.channels}</label>
                 <div className="channel-picker">
                   {channelAvailability.map(({ channel, conflict }) => {
                     const selected = selectedChannelSet.has(channel);
@@ -364,32 +383,31 @@ export default function Home() {
                         onClick={() => toggleChannel(channel)}
                         title={
                           conflict
-                            ? `${conflict.applicant}'s booking overlaps this time range`
+                            ? copy.home.conflictTitle(conflict.applicant)
                             : selected
-                              ? `${channel} selected`
-                              : `Add ${channel}`
+                              ? copy.home.selectedTitle(channel)
+                              : copy.home.addChannelTitle(channel)
                         }
                       >
                         <span>{channel}</span>
                         <small>
                           {conflict
-                            ? 'Booked'
+                            ? copy.home.booked
                             : selected
-                              ? 'Selected'
-                              : 'Available'}
+                              ? copy.home.selected
+                              : copy.home.available}
                         </small>
                       </button>
                     );
                   })}
                 </div>
                 <div className="inline-note">
-                  Channels already booked during the selected time range are disabled.
-                  Select multiple available channels to reserve them together.
+                  {copy.home.channelHelp}
                 </div>
               </div>
 
               <div className="field">
-                <label htmlFor="modal-start">Equipment Start</label>
+                <label htmlFor="modal-start">{copy.home.equipmentStart}</label>
                 <input
                   id="modal-start"
                   type="datetime-local"
@@ -399,7 +417,7 @@ export default function Home() {
               </div>
 
               <div className="field">
-                <label htmlFor="modal-end-date">Equipment End</label>
+                <label htmlFor="modal-end-date">{copy.home.equipmentEnd}</label>
                 <div className="end-picker-grid">
                   <select
                     id="modal-end-date"
@@ -437,31 +455,29 @@ export default function Home() {
               </div>
 
               <div className="field full">
-                <label htmlFor="modal-purpose">Memo</label>
+                <label htmlFor="modal-purpose">{copy.home.memo}</label>
                 <textarea
                   id="modal-purpose"
                   value={purpose}
                   onChange={(event) => setPurpose(event.target.value)}
-                  placeholder="Add experiment notes or handoff details."
+                  placeholder={copy.home.memoPlaceholder}
                 />
               </div>
 
               <div className="inline-note full-line">
-                The start time is fixed to the slot you clicked. The end time can only
-                be set in 1-hour increments, up to {settings.maxDurationDays} days
-                from the start time.
+                {copy.home.endTimeHelp(settings.maxDurationDays)}
               </div>
 
               <div className="action-row">
                 <button className="button" type="submit" disabled={!canSaveBooking}>
-                  Save Booking
+                  {copy.home.saveBooking}
                 </button>
                 <button
                   type="button"
                   className="button-ghost"
                   onClick={() => setSelectedSlot(null)}
                 >
-                  Cancel
+                  {copy.home.cancel}
                 </button>
               </div>
             </form>

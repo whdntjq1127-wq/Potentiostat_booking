@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import './globals.css';
+import { LanguageProvider } from '../components/language-context';
 import { ReservationProvider } from '../components/reservation-context';
 import { SiteShell } from '../components/site-shell';
 
@@ -17,9 +18,11 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body>
-        <ReservationProvider>
-          <SiteShell>{children}</SiteShell>
-        </ReservationProvider>
+        <LanguageProvider>
+          <ReservationProvider>
+            <SiteShell>{children}</SiteShell>
+          </ReservationProvider>
+        </LanguageProvider>
       </body>
     </html>
   );

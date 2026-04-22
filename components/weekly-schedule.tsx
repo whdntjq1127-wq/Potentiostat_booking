@@ -1,12 +1,15 @@
 'use client';
 
 import { useEffect, useMemo, useRef, type CSSProperties } from 'react';
+import {
+  formatShortDateLabelForLanguage,
+} from '../lib/i18n';
 import { useReservation } from './reservation-context';
+import { useLanguage } from './language-context';
 import {
   CHANNELS,
   addHours,
   findActiveBookingConflict,
-  formatShortDateLabel,
   getChannelColor,
   getChannelSoftColor,
   getWeekDates,
@@ -39,6 +42,7 @@ export function WeeklySchedule({
   onShiftWeek,
 }: WeeklyScheduleProps) {
   const { bookings, blockedDates, settings } = useReservation();
+  const { copy, language } = useLanguage();
   const hourRowRefs = useRef<Record<number, HTMLTableRowElement | null>>({});
   const previousHourRef = useRef<number | null>(null);
   const weekDates = getWeekDates(anchorDate);
@@ -81,18 +85,21 @@ export function WeeklySchedule({
           className="button-ghost"
           onClick={() => onShiftWeek(-1)}
         >
-          Previous Week
+          {copy.schedule.previousWeek}
         </button>
         <strong>
-          {formatShortDateLabel(weekDates[0])} -{' '}
-          {formatShortDateLabel(weekDates[weekDates.length - 1])}
+          {formatShortDateLabelForLanguage(weekDates[0], language)} -{' '}
+          {formatShortDateLabelForLanguage(
+            weekDates[weekDates.length - 1],
+            language,
+          )}
         </strong>
         <button
           type="button"
           className="button-ghost"
           onClick={() => onShiftWeek(1)}
         >
-          Next Week
+          {copy.schedule.nextWeek}
         </button>
       </div>
 
@@ -101,7 +108,7 @@ export function WeeklySchedule({
           <thead>
             <tr>
               <th className="corner-cell time-head" rowSpan={2}>
-                Starting time
+                {copy.schedule.startingTime}
               </th>
               {weekDates.map((date) => (
                 <th
@@ -109,7 +116,7 @@ export function WeeklySchedule({
                   className="date-head"
                   colSpan={CHANNELS.length}
                 >
-                  {formatShortDateLabel(date)}
+                  {formatShortDateLabelForLanguage(date, language)}
                 </th>
               ))}
             </tr>
@@ -218,12 +225,14 @@ export function WeeklySchedule({
                           disabled={!selectable}
                           title={
                             visibleBooking
-                              ? `${visibleBooking.applicant}'s booking`
+                              ? copy.schedule.bookedByTitle(
+                                  visibleBooking.applicant,
+                                )
                               : inBlockedDate
-                                ? 'This date is blocked by the admin'
+                                ? copy.schedule.blockedDateTitle
                                 : inWindow
-                                  ? 'This slot cannot be selected'
-                                  : 'The start date is outside the booking window'
+                                  ? copy.schedule.notSelectableTitle
+                                  : copy.schedule.outsideWindowTitle
                           }
                         >
                           {visibleBooking
