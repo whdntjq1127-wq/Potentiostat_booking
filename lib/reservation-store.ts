@@ -1,5 +1,6 @@
+import { existsSync } from 'fs';
 import { mkdir, readFile, rename, writeFile } from 'fs/promises';
-import { dirname } from 'path';
+import { dirname, join } from 'path';
 import {
   DEFAULT_SETTINGS,
   compareBookings,
@@ -85,6 +86,8 @@ declare global {
 }
 
 let fileStoreQueue: Promise<void> = Promise.resolve();
+
+const RENDER_DISK_STORE_FILE = '/var/data/reservations.json';
 
 function getMemorySnapshot() {
   if (!globalThis.__potentiostatReservationSnapshot) {
@@ -173,6 +176,18 @@ function queueFileStoreTask<T>(task: () => Promise<T>) {
     () => undefined,
   );
   return nextTask;
+}
+
+function getDefaultProductionStoreFile() {
+  if (process.env.NODE_ENV !== 'production') {
+    return undefined;
+  }
+
+  if (existsSync(dirname(RENDER_DISK_STORE_FILE))) {
+    return RENDER_DISK_STORE_FILE;
+  }
+
+  return join(process.cwd(), 'data', 'reservations.json');
 }
 
 class MemoryReservationStore implements ReservationStore {
@@ -603,7 +618,8 @@ class SupabaseReservationStore implements ReservationStore {
 export function getReservationStore(): ReservationStore {
   const supabaseUrl = process.env.SUPABASE_URL;
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  const filePath = process.env.RESERVATION_STORE_FILE;
+  const filePath =
+    process.env.RESERVATION_STORE_FILE?.trim() || getDefaultProductionStoreFile();
 
   if (supabaseUrl && serviceKey) {
     return new SupabaseReservationStore(supabaseUrl, serviceKey);
@@ -611,12 +627,6 @@ export function getReservationStore(): ReservationStore {
 
   if (filePath) {
     return new FileReservationStore(filePath);
-  }
-
-  if (process.env.NODE_ENV === 'production') {
-    throw new Error(
-      'Persistent reservation storage is not configured. Set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY, or set RESERVATION_STORE_FILE to a path on a Render persistent disk.',
-    );
   }
 
   return new MemoryReservationStore();

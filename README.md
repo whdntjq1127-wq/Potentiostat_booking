@@ -11,11 +11,14 @@ this order:
 1. Supabase, when both `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` are set.
 1. A JSON file, when `RESERVATION_STORE_FILE` is set. On Render, this file must
    be inside a persistent disk mount such as `/var/data`.
-1. In-memory storage, only during local development.
+1. In production, a default JSON file. The app uses `/var/data/reservations.json`
+   when `/var/data` exists, otherwise `data/reservations.json` in the app
+   directory.
+1. In-memory storage, only during local development when no file path is set.
 
-Production no longer falls back to memory storage. This prevents reservations
-from appearing to save successfully and then disappearing after a Render deploy,
-restart, or free-instance spin-down.
+Production no longer falls back to memory storage, so the app remains usable even
+when environment variables are missing. For data to survive Render deploys and
+restarts, use Supabase or a Render persistent disk mounted at `/var/data`.
 
 ### Supabase option
 
@@ -39,8 +42,8 @@ notices, settings, and change history are written to that file and survive norma
 deploys and restarts.
 
 Important: Render persistent disks require a paid web service plan. Free Render
-web services have an ephemeral filesystem, so local files are lost on deploy,
-restart, and spin-down.
+web services have an ephemeral filesystem. The app will still work by writing a
+local JSON file, but that file can be lost on deploy, restart, and spin-down.
 
 ## Deploying to Render
 
