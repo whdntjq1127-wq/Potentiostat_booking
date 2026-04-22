@@ -2,13 +2,19 @@ services:
   - type: web
     name: next-js
     runtime: node
-    plan: free
+    plan: starter
     buildCommand: pnpm install; pnpm build
     startCommand: pnpm start
     autoDeploy: false
+    disk:
+      name: reservation-data
+      mountPath: /var/data
+      sizeGB: 1
     envVars:
       - key: PORT
         value: 10000
+      - key: RESERVATION_STORE_FILE
+        value: /var/data/reservations.json
       - key: SUPABASE_URL
         sync: false
       - key: SUPABASE_SERVICE_ROLE_KEY

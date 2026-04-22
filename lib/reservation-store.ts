@@ -1,3 +1,5 @@
+import { mkdir, readFile, rename, writeFile } from 'fs/promises';
+import { dirname } from 'path';
 import {
   DEFAULT_SETTINGS,
   compareBookings,
@@ -82,6 +84,8 @@ declare global {
   var __potentiostatReservationSnapshot: ReservationSnapshot | undefined;
 }
 
+let fileStoreQueue: Promise<void> = Promise.resolve();
+
 function getMemorySnapshot() {
   if (!globalThis.__potentiostatReservationSnapshot) {
     globalThis.__potentiostatReservationSnapshot = createInitialReservationState();
@@ -151,6 +155,24 @@ function fromChangeLogRow(row: ChangeLogRow): ChangeLogEntry {
 
 function isConflictError(message?: string) {
   return !!message && /overlap|exclusion|duplicate key|conflict/i.test(message);
+}
+
+function isMissingFileError(error: unknown) {
+  return (
+    typeof error === 'object' &&
+    error !== null &&
+    'code' in error &&
+    error.code === 'ENOENT'
+  );
+}
+
+function queueFileStoreTask<T>(task: () => Promise<T>) {
+  const nextTask = fileStoreQueue.then(task, task);
+  fileStoreQueue = nextTask.then(
+    () => undefined,
+    () => undefined,
+  );
+  return nextTask;
 }
 
 class MemoryReservationStore implements ReservationStore {
@@ -242,6 +264,123 @@ class MemoryReservationStore implements ReservationStore {
       changeLogs: [log, ...current.changeLogs].sort(compareChangeLogs),
     });
     return { ok: true };
+  }
+}
+
+class FileReservationStore implements ReservationStore {
+  private readonly filePath: string;
+
+  constructor(filePath: string) {
+    this.filePath = filePath;
+  }
+
+  private async readSnapshotFile() {
+    try {
+      const contents = await readFile(this.filePath, 'utf8');
+      return JSON.parse(contents) as ReservationSnapshot;
+    } catch (error) {
+      if (isMissingFileError(error)) {
+        const initialSnapshot = createInitialReservationState();
+        await this.writeSnapshotFile(initialSnapshot);
+        return initialSnapshot;
+      }
+
+      throw error;
+    }
+  }
+
+  private async writeSnapshotFile(snapshot: ReservationSnapshot) {
+    await mkdir(dirname(this.filePath), { recursive: true });
+    const temporaryPath = `${this.filePath}.${process.pid}.tmp`;
+    await writeFile(temporaryPath, `${JSON.stringify(snapshot, null, 2)}\n`);
+    await rename(temporaryPath, this.filePath);
+  }
+
+  private async updateSnapshot(
+    updater: (current: ReservationSnapshot) => ReservationSnapshot,
+  ) {
+    await queueFileStoreTask(async () => {
+      const current = pruneExpiredReservationState(await this.readSnapshotFile());
+      await this.writeSnapshotFile(updater(current));
+    });
+    return { ok: true };
+  }
+
+  async readSnapshot() {
+    return queueFileStoreTask(async () => {
+      const current = await this.readSnapshotFile();
+      const pruned = pruneExpiredReservationState(current);
+      await this.writeSnapshotFile(pruned);
+      return pruned;
+    });
+  }
+
+  async insertBookings(bookings: Booking[], logs: ChangeLogEntry[]) {
+    return this.updateSnapshot((current) => ({
+      ...current,
+      bookings: [...current.bookings, ...bookings].sort(compareBookings),
+      changeLogs: [...logs, ...current.changeLogs].sort(compareChangeLogs),
+    }));
+  }
+
+  async updateBooking(booking: Booking, log: ChangeLogEntry) {
+    return this.updateSnapshot((current) => ({
+      ...current,
+      bookings: current.bookings
+        .map((item) => (item.id === booking.id ? booking : item))
+        .sort(compareBookings),
+      changeLogs: [log, ...current.changeLogs].sort(compareChangeLogs),
+    }));
+  }
+
+  async cancelBooking(id: string, log: ChangeLogEntry) {
+    return this.updateSnapshot((current) => ({
+      ...current,
+      bookings: current.bookings.map((booking) =>
+        booking.id === id ? { ...booking, status: 'cancelled' } : booking,
+      ),
+      changeLogs: [log, ...current.changeLogs].sort(compareChangeLogs),
+    }));
+  }
+
+  async addBlockedDate(date: string, log: ChangeLogEntry) {
+    return this.updateSnapshot((current) => ({
+      ...current,
+      blockedDates: [...current.blockedDates, date].sort(),
+      changeLogs: [log, ...current.changeLogs].sort(compareChangeLogs),
+    }));
+  }
+
+  async removeBlockedDate(date: string, log: ChangeLogEntry) {
+    return this.updateSnapshot((current) => ({
+      ...current,
+      blockedDates: current.blockedDates.filter((item) => item !== date),
+      changeLogs: [log, ...current.changeLogs].sort(compareChangeLogs),
+    }));
+  }
+
+  async addNotice(notice: string, log: ChangeLogEntry) {
+    return this.updateSnapshot((current) => ({
+      ...current,
+      notices: [notice, ...current.notices],
+      changeLogs: [log, ...current.changeLogs].sort(compareChangeLogs),
+    }));
+  }
+
+  async removeNotice(notice: string, log: ChangeLogEntry) {
+    return this.updateSnapshot((current) => ({
+      ...current,
+      notices: current.notices.filter((item) => item !== notice),
+      changeLogs: [log, ...current.changeLogs].sort(compareChangeLogs),
+    }));
+  }
+
+  async updateSettings(settings: ReservationSettings, log: ChangeLogEntry) {
+    return this.updateSnapshot((current) => ({
+      ...current,
+      settings,
+      changeLogs: [log, ...current.changeLogs].sort(compareChangeLogs),
+    }));
   }
 }
 
@@ -464,9 +603,20 @@ class SupabaseReservationStore implements ReservationStore {
 export function getReservationStore(): ReservationStore {
   const supabaseUrl = process.env.SUPABASE_URL;
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const filePath = process.env.RESERVATION_STORE_FILE;
 
   if (supabaseUrl && serviceKey) {
     return new SupabaseReservationStore(supabaseUrl, serviceKey);
+  }
+
+  if (filePath) {
+    return new FileReservationStore(filePath);
+  }
+
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error(
+      'Persistent reservation storage is not configured. Set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY, or set RESERVATION_STORE_FILE to a path on a Render persistent disk.',
+    );
   }
 
   return new MemoryReservationStore();

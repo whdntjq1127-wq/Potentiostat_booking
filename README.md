@@ -5,7 +5,21 @@ This is a Next.js template which can be deployed to [Render](https://render.com)
 ## Shared Booking Data
 
 The app now uses server API routes instead of browser `localStorage`. For real
-multi-user operation, connect it to Supabase PostgreSQL:
+multi-user operation, use a durable server-side store. The app chooses storage in
+this order:
+
+1. Supabase, when both `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` are set.
+1. A JSON file, when `RESERVATION_STORE_FILE` is set. On Render, this file must
+   be inside a persistent disk mount such as `/var/data`.
+1. In-memory storage, only during local development.
+
+Production no longer falls back to memory storage. This prevents reservations
+from appearing to save successfully and then disappearing after a Render deploy,
+restart, or free-instance spin-down.
+
+### Supabase option
+
+To use Supabase PostgreSQL:
 
 1. Create a Supabase project.
 1. Open the Supabase SQL editor and run `database/schema.sql`.
@@ -17,8 +31,16 @@ multi-user operation, connect it to Supabase PostgreSQL:
 - `ADMIN_PASSWORD`: password for the admin page.
 - `ADMIN_SESSION_SECRET`: random secret used to sign the admin cookie.
 
-If Supabase variables are missing, the app falls back to an in-memory development
-store. That fallback is not durable and should not be used for production.
+### Render persistent disk option
+
+The included `render.yaml` attaches a persistent disk at `/var/data` and sets
+`RESERVATION_STORE_FILE=/var/data/reservations.json`. Reservations, blocked dates,
+notices, settings, and change history are written to that file and survive normal
+deploys and restarts.
+
+Important: Render persistent disks require a paid web service plan. Free Render
+web services have an ephemeral filesystem, so local files are lost on deploy,
+restart, and spin-down.
 
 ## Deploying to Render
 
@@ -45,9 +67,12 @@ Note: The button uses the `render.yaml` file in this repo to deploy your app. Fo
 - Runtime: Node
 - Build Command: `pnpm install; pnpm build`
 - Start Command: `pnpm start`
+- Add a persistent disk mounted at `/var/data`.
+- Set `RESERVATION_STORE_FILE` to `/var/data/reservations.json`.
 
-Add the environment variables from `.env.example` in the Render dashboard before
-using the site with multiple users.
+Add the admin environment variables from `.env.example` in the Render dashboard
+before using the site with multiple users. If you prefer Supabase, add the
+Supabase variables instead; Supabase takes priority over the JSON file store.
 
 ## Learn More
 To learn more about deploying Next.js, take a look at the following resources:
