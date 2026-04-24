@@ -3,9 +3,20 @@ services:
     name: next-js
     runtime: node
     plan: starter
-    buildCommand: pnpm install; pnpm build
+    buildCommand: pnpm install --frozen-lockfile && pnpm build
     startCommand: pnpm start
     autoDeploy: false
+    buildFilter:
+      paths:
+        - app/**
+        - components/**
+        - lib/**
+        - package.json
+        - pnpm-lock.yaml
+        - next.config.ts
+        - next-env.d.ts
+        - tsconfig.json
+        - render.yaml
     disk:
       name: reservation-data
       mountPath: /var/data
