@@ -44,6 +44,13 @@ type StoreMutationResult = {
   message?: string;
 };
 
+type SupabaseKeyKind =
+  | 'service-role-jwt'
+  | 'low-privilege-jwt'
+  | 'secret'
+  | 'publishable'
+  | 'unknown';
+
 export type ReservationStore = {
   readSnapshot: () => Promise<ReservationSnapshot>;
   replaceSnapshot: (
@@ -187,6 +194,78 @@ function getDefaultProductionStoreFile() {
   }
 
   return join(process.cwd(), 'data', 'reservations.json');
+}
+
+function decodeJwtPayload(token: string) {
+  const segments = token.split('.');
+
+  if (segments.length !== 3) {
+    return null;
+  }
+
+  try {
+    const normalized = segments[1].replace(/-/g, '+').replace(/_/g, '/');
+    const padded = normalized.padEnd(
+      normalized.length + ((4 - (normalized.length % 4)) % 4),
+      '=',
+    );
+    return JSON.parse(Buffer.from(padded, 'base64').toString('utf8')) as {
+      role?: string;
+    };
+  } catch {
+    return null;
+  }
+}
+
+function getSupabaseKeyKind(key: string): SupabaseKeyKind {
+  if (key.startsWith('sb_secret_')) {
+    return 'secret';
+  }
+
+  if (key.startsWith('sb_publishable_')) {
+    return 'publishable';
+  }
+
+  const payload = decodeJwtPayload(key);
+
+  if (!payload?.role) {
+    return 'unknown';
+  }
+
+  if (payload.role === 'service_role') {
+    return 'service-role-jwt';
+  }
+
+  return 'low-privilege-jwt';
+}
+
+function getSupabaseConfigurationError(key: string) {
+  const keyKind = getSupabaseKeyKind(key);
+
+  if (keyKind === 'publishable' || keyKind === 'low-privilege-jwt') {
+    return (
+      'SUPABASE_SERVICE_ROLE_KEY is using a low-privilege Supabase key. ' +
+      'Set it to the server-side service_role or secret key in Render and redeploy.'
+    );
+  }
+
+  return null;
+}
+
+function explainSupabasePermissionError(message: string) {
+  if (!/permission denied for table/i.test(message)) {
+    return message;
+  }
+
+  const tableMatch = message.match(/permission denied for table ([a-zA-Z0-9_]+)/i);
+  const tableName = tableMatch?.[1] ?? 'the requested table';
+
+  return (
+    `Supabase Data API does not have access to ${tableName}. ` +
+    'Run the updated database/schema.sql in the Supabase SQL Editor to grant ' +
+    'service_role access, then redeploy Render. Also verify that ' +
+    'SUPABASE_SERVICE_ROLE_KEY is set to the Supabase service_role or secret key.'
+  );
 }
 
 class MemoryReservationStore implements ReservationStore {
@@ -448,7 +527,11 @@ class SupabaseReservationStore implements ReservationStore {
 
     if (!response.ok) {
       const message = await response.text();
-      throw new Error(message || `Supabase request failed: ${response.status}`);
+      throw new Error(
+        explainSupabasePermissionError(
+          message || `Supabase request failed: ${response.status}`,
+        ),
+      );
     }
 
     if (response.status === 204) {
@@ -707,6 +790,12 @@ export function getReservationStore(): ReservationStore {
   let store: ReservationStore;
 
   if (supabaseUrl && serviceKey) {
+    const configurationError = getSupabaseConfigurationError(serviceKey);
+
+    if (configurationError) {
+      throw new Error(configurationError);
+    }
+
     store = new SupabaseReservationStore(supabaseUrl, serviceKey);
   } else if (filePath) {
     store = new FileReservationStore(filePath);

@@ -70,3 +70,21 @@ create table if not exists pb_settings (
 insert into pb_settings (id, booking_window_days, max_duration_days)
 values ('default', 5, 5)
 on conflict (id) do nothing;
+
+grant usage on schema public to service_role;
+
+grant select, insert, update, delete on table
+  public.pb_bookings,
+  public.pb_change_logs,
+  public.pb_blocked_dates,
+  public.pb_notices,
+  public.pb_settings
+to service_role;
+
+revoke all on table
+  public.pb_bookings,
+  public.pb_change_logs,
+  public.pb_blocked_dates,
+  public.pb_notices,
+  public.pb_settings
+from anon, authenticated;
