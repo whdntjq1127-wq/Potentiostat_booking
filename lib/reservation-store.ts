@@ -502,10 +502,12 @@ class FileReservationStore implements ReservationStore {
 class SupabaseReservationStore implements ReservationStore {
   private readonly baseUrl: string;
   private readonly serviceKey: string;
+  private readonly keyKind: SupabaseKeyKind;
 
   constructor(baseUrl: string, serviceKey: string) {
     this.baseUrl = baseUrl.replace(/\/$/, '');
     this.serviceKey = serviceKey;
+    this.keyKind = getSupabaseKeyKind(serviceKey);
   }
 
   private async request<T>(
@@ -517,7 +519,9 @@ class SupabaseReservationStore implements ReservationStore {
       ...init,
       headers: {
         apikey: this.serviceKey,
-        Authorization: `Bearer ${this.serviceKey}`,
+        ...(this.keyKind === 'service-role-jwt' || this.keyKind === 'low-privilege-jwt'
+          ? { Authorization: `Bearer ${this.serviceKey}` }
+          : {}),
         'Content-Type': 'application/json',
         ...(prefer ? { Prefer: prefer } : {}),
         ...init.headers,
