@@ -48,6 +48,10 @@ export type ReservationAction =
       type: 'cancelBooking';
       payload: { id: string; requestedBy: string };
     }
+  | {
+      type: 'recoverLegacySnapshot';
+      payload: { snapshot: ReservationSnapshot };
+    }
   | { type: 'addBlockedDate'; payload: { date: string } }
   | { type: 'removeBlockedDate'; payload: { date: string } }
   | { type: 'addNotice'; payload: { notice: string } }
@@ -113,6 +117,58 @@ function withSortedSnapshot(snapshot: ReservationSnapshot): ReservationSnapshot 
     changeLogs: [...snapshot.changeLogs].sort(compareChangeLogs),
     blockedDates: [...snapshot.blockedDates].sort(),
   };
+}
+
+function normalizeLegacySnapshot(snapshot: ReservationSnapshot): ReservationSnapshot {
+  return withSortedSnapshot(
+    pruneExpiredReservationState({
+      bookings: Array.isArray(snapshot.bookings) ? snapshot.bookings : [],
+      blockedDates: Array.isArray(snapshot.blockedDates)
+        ? snapshot.blockedDates.filter((value): value is string => typeof value === 'string')
+        : [],
+      notices: Array.isArray(snapshot.notices)
+        ? snapshot.notices.filter((value): value is string => typeof value === 'string')
+        : [],
+      settings:
+        snapshot.settings &&
+        Number.isFinite(snapshot.settings.bookingWindowDays) &&
+        Number.isFinite(snapshot.settings.maxDurationDays)
+          ? {
+              bookingWindowDays: Math.floor(snapshot.settings.bookingWindowDays),
+              maxDurationDays: Math.floor(snapshot.settings.maxDurationDays),
+            }
+          : snapshot.settings,
+      changeLogs: Array.isArray(snapshot.changeLogs) ? snapshot.changeLogs : [],
+    }),
+  );
+}
+
+function mergeUniqueById<T extends { id: string }>(current: T[], incoming: T[]) {
+  const merged = new Map(current.map((item) => [item.id, item]));
+
+  for (const item of incoming) {
+    if (!merged.has(item.id)) {
+      merged.set(item.id, item);
+    }
+  }
+
+  return [...merged.values()];
+}
+
+function mergeLegacySnapshot(
+  current: ReservationSnapshot,
+  legacy: ReservationSnapshot,
+) {
+  const normalizedLegacy = normalizeLegacySnapshot(legacy);
+
+  return withSortedSnapshot({
+    ...current,
+    bookings: mergeUniqueById(current.bookings, normalizedLegacy.bookings),
+    blockedDates: [...new Set([...current.blockedDates, ...normalizedLegacy.blockedDates])],
+    notices: [...current.notices, ...normalizedLegacy.notices.filter((notice) => !current.notices.includes(notice))],
+    settings: current.settings,
+    changeLogs: mergeUniqueById(current.changeLogs, normalizedLegacy.changeLogs),
+  });
 }
 
 export async function readReservationSnapshot() {
@@ -391,6 +447,39 @@ export async function applyReservationAction(
       return response({
         ok: mutation.ok,
         message: mutation.message ?? `${target.applicant}'s booking was cancelled.`,
+      });
+    }
+
+    case 'recoverLegacySnapshot': {
+      const recoveredSnapshot = mergeLegacySnapshot(
+        snapshot,
+        action.payload.snapshot,
+      );
+      const recoveredCount =
+        recoveredSnapshot.bookings.length - snapshot.bookings.length;
+
+      if (recoveredCount <= 0) {
+        return response({
+          ok: true,
+          message: 'No legacy bookings needed to be restored.',
+        });
+      }
+
+      const mutation = await store.replaceSnapshot(recoveredSnapshot);
+
+      if (!mutation.ok) {
+        return response({
+          ok: false,
+          message: mutation.message ?? 'Failed to restore legacy bookings.',
+        });
+      }
+
+      return response({
+        ok: true,
+        message:
+          recoveredCount === 1
+            ? '1 legacy booking has been restored.'
+            : `${recoveredCount} legacy bookings have been restored.`,
       });
     }
 

@@ -46,6 +46,9 @@ type StoreMutationResult = {
 
 export type ReservationStore = {
   readSnapshot: () => Promise<ReservationSnapshot>;
+  replaceSnapshot: (
+    snapshot: ReservationSnapshot,
+  ) => Promise<StoreMutationResult>;
   insertBookings: (
     bookings: Booking[],
     logs: ChangeLogEntry[],
@@ -193,6 +196,11 @@ class MemoryReservationStore implements ReservationStore {
     return pruned;
   }
 
+  async replaceSnapshot(snapshot: ReservationSnapshot) {
+    setMemorySnapshot(pruneExpiredReservationState(snapshot));
+    return { ok: true };
+  }
+
   async insertBookings(bookings: Booking[], logs: ChangeLogEntry[]) {
     const current = await this.readSnapshot();
     setMemorySnapshot({
@@ -333,6 +341,13 @@ class FileReservationStore implements ReservationStore {
       const pruned = pruneExpiredReservationState(current);
       await this.writeSnapshotFile(pruned);
       return pruned;
+    });
+  }
+
+  async replaceSnapshot(snapshot: ReservationSnapshot) {
+    return this.queueTask(async () => {
+      await this.writeSnapshotFile(pruneExpiredReservationState(snapshot));
+      return { ok: true };
     });
   }
 
@@ -519,6 +534,58 @@ class SupabaseReservationStore implements ReservationStore {
           : message || 'Failed to save booking.',
       };
     }
+  }
+
+  async replaceSnapshot(snapshot: ReservationSnapshot) {
+    const next = pruneExpiredReservationState(snapshot);
+
+    await Promise.all([
+      this.request('/pb_bookings?id=not.is.null', { method: 'DELETE' }),
+      this.request('/pb_change_logs?id=not.is.null', { method: 'DELETE' }),
+      this.request('/pb_blocked_dates?date=not.is.null', { method: 'DELETE' }),
+      this.request('/pb_notices?notice=not.is.null', { method: 'DELETE' }),
+    ]);
+
+    if (next.bookings.length > 0) {
+      await this.request('/pb_bookings', {
+        method: 'POST',
+        body: JSON.stringify(next.bookings.map(toBookingRow)),
+      });
+    }
+
+    if (next.changeLogs.length > 0) {
+      await this.insertLogs(next.changeLogs);
+    }
+
+    if (next.blockedDates.length > 0) {
+      await this.request('/pb_blocked_dates', {
+        method: 'POST',
+        body: JSON.stringify(next.blockedDates.map((date) => ({ date }))),
+      });
+    }
+
+    if (next.notices.length > 0) {
+      await this.request('/pb_notices', {
+        method: 'POST',
+        body: JSON.stringify(next.notices.map((notice) => ({ notice }))),
+      });
+    }
+
+    await this.request(
+      '/pb_settings',
+      {
+        method: 'POST',
+        body: JSON.stringify({
+          id: 'default',
+          booking_window_days: next.settings.bookingWindowDays,
+          max_duration_days: next.settings.maxDurationDays,
+          updated_at: new Date().toISOString(),
+        }),
+      },
+      'resolution=merge-duplicates',
+    );
+
+    return { ok: true };
   }
 
   async updateBooking(booking: Booking, log: ChangeLogEntry) {

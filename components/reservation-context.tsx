@@ -70,10 +70,35 @@ type ReservationContextValue = {
 };
 
 const ReservationContext = createContext<ReservationContextValue | null>(null);
+const LEGACY_STORAGE_KEYS = [
+  'potentiostat-booking-demo-v3',
+  'potentiostat-booking-demo-v2',
+] as const;
+const LEGACY_RECOVERY_MARKER = 'potentiostat-booking-legacy-recovered-v1';
 
 async function readJson<T>(response: Response): Promise<T | null> {
   const text = await response.text();
   return text ? (JSON.parse(text) as T) : null;
+}
+
+function readLegacySnapshot() {
+  if (typeof window === 'undefined') {
+    return null;
+  }
+
+  try {
+    const raw = LEGACY_STORAGE_KEYS
+      .map((key) => window.localStorage.getItem(key))
+      .find((value) => !!value);
+
+    if (!raw) {
+      return null;
+    }
+
+    return JSON.parse(raw) as ReservationSnapshot;
+  } catch {
+    return null;
+  }
 }
 
 export function ReservationProvider({ children }: { children: ReactNode }) {
@@ -178,6 +203,47 @@ export function ReservationProvider({ children }: { children: ReactNode }) {
     },
     [],
   );
+
+  useEffect(() => {
+    if (!ready || typeof window === 'undefined') {
+      return;
+    }
+
+    const marker = window.localStorage.getItem(LEGACY_RECOVERY_MARKER);
+    if (marker === 'done' || marker === 'running') {
+      return;
+    }
+
+    const legacySnapshot = readLegacySnapshot();
+    if (!legacySnapshot || !Array.isArray(legacySnapshot.bookings)) {
+      return;
+    }
+
+    const currentBookingIds = new Set(snapshot.bookings.map((booking) => booking.id));
+    const hasMissingLegacyBookings = legacySnapshot.bookings.some(
+      (booking) => booking?.id && !currentBookingIds.has(booking.id),
+    );
+
+    if (!hasMissingLegacyBookings) {
+      window.localStorage.setItem(LEGACY_RECOVERY_MARKER, 'done');
+      return;
+    }
+
+    window.localStorage.setItem(LEGACY_RECOVERY_MARKER, 'running');
+
+    void (async () => {
+      const result = await runAction('recoverLegacySnapshot', {
+        snapshot: legacySnapshot,
+      });
+
+      if (result.ok) {
+        window.localStorage.setItem(LEGACY_RECOVERY_MARKER, 'done');
+        return;
+      }
+
+      window.localStorage.removeItem(LEGACY_RECOVERY_MARKER);
+    })();
+  }, [ready, runAction, snapshot.bookings]);
 
   const value = useMemo<ReservationContextValue>(
     () => ({
