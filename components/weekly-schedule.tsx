@@ -23,6 +23,7 @@ import {
 
 export type SelectedSlot = {
   channel: Channel;
+  channels?: Channel[];
   startAt: string;
   endAt: string;
 };
@@ -37,8 +38,9 @@ type WeeklyScheduleProps = {
 };
 
 type DragSelection = {
-  channel: Channel;
   dateKey: string;
+  startChannel: Channel;
+  endChannel: Channel;
   startHour: number;
   endHour: number;
 };
@@ -111,16 +113,33 @@ export function WeeklySchedule({
 
   function isDragRangeSelectable(
     date: Date,
-    channel: Channel,
+    startChannel: Channel,
+    endChannel: Channel,
     startHour: number,
     endHour: number,
   ) {
+    const firstChannelIndex = Math.min(
+      CHANNELS.indexOf(startChannel),
+      CHANNELS.indexOf(endChannel),
+    );
+    const lastChannelIndex = Math.max(
+      CHANNELS.indexOf(startChannel),
+      CHANNELS.indexOf(endChannel),
+    );
     const firstHour = Math.min(startHour, endHour);
     const lastHour = Math.max(startHour, endHour);
 
-    for (let hour = firstHour; hour <= lastHour; hour += 1) {
-      if (!isSlotSelectable(date, channel, hour)) {
-        return false;
+    for (
+      let channelIndex = firstChannelIndex;
+      channelIndex <= lastChannelIndex;
+      channelIndex += 1
+    ) {
+      const channel = CHANNELS[channelIndex];
+
+      for (let hour = firstHour; hour <= lastHour; hour += 1) {
+        if (!isSlotSelectable(date, channel, hour)) {
+          return false;
+        }
       }
     }
 
@@ -143,9 +162,22 @@ export function WeeklySchedule({
 
     const firstHour = Math.min(selection.startHour, selection.endHour);
     const lastHour = Math.max(selection.startHour, selection.endHour);
+    const firstChannelIndex = Math.min(
+      CHANNELS.indexOf(selection.startChannel),
+      CHANNELS.indexOf(selection.endChannel),
+    );
+    const lastChannelIndex = Math.max(
+      CHANNELS.indexOf(selection.startChannel),
+      CHANNELS.indexOf(selection.endChannel),
+    );
+    const selectedChannels = CHANNELS.slice(
+      firstChannelIndex,
+      lastChannelIndex + 1,
+    );
 
     onSelectSlot({
-      channel: selection.channel,
+      channel: selectedChannels[0],
+      channels: selectedChannels,
       startAt: toDateTimeLocal(setHour(selectedDate, firstHour)),
       endAt: toDateTimeLocal(setHour(selectedDate, lastHour + 1)),
     });
@@ -263,8 +295,17 @@ export function WeeklySchedule({
                     const selectable = !activeBooking && !inBlockedDate && inWindow;
                     const inDragSelection =
                       !!dragSelection &&
-                      dragSelection.channel === channel &&
                       dragSelection.dateKey === slotDateKey &&
+                      channelIndex >=
+                        Math.min(
+                          CHANNELS.indexOf(dragSelection.startChannel),
+                          CHANNELS.indexOf(dragSelection.endChannel),
+                        ) &&
+                      channelIndex <=
+                        Math.max(
+                          CHANNELS.indexOf(dragSelection.startChannel),
+                          CHANNELS.indexOf(dragSelection.endChannel),
+                        ) &&
                       group.hour >=
                         Math.min(
                           dragSelection.startHour,
@@ -318,8 +359,9 @@ export function WeeklySchedule({
 
                             event.preventDefault();
                             setDragSelection({
-                              channel,
                               dateKey: slotDateKey,
+                              startChannel: channel,
+                              endChannel: channel,
                               startHour: group.hour,
                               endHour: group.hour,
                             });
@@ -328,7 +370,6 @@ export function WeeklySchedule({
                             if (
                               !dragSelection ||
                               event.buttons !== 1 ||
-                              dragSelection.channel !== channel ||
                               dragSelection.dateKey !== slotDateKey
                             ) {
                               return;
@@ -337,6 +378,7 @@ export function WeeklySchedule({
                             if (
                               isDragRangeSelectable(
                                 date,
+                                dragSelection.startChannel,
                                 channel,
                                 dragSelection.startHour,
                                 group.hour,
@@ -344,6 +386,7 @@ export function WeeklySchedule({
                             ) {
                               setDragSelection({
                                 ...dragSelection,
+                                endChannel: channel,
                                 endHour: group.hour,
                               });
                             }

@@ -101,7 +101,7 @@ export default function Home() {
       return;
     }
 
-    setSelectedChannels([selectedSlot.channel]);
+    setSelectedChannels(selectedSlot.channels ?? [selectedSlot.channel]);
     setApplicant('');
     setPurpose('');
     setBookingPassword('');
@@ -128,11 +128,14 @@ export default function Home() {
         break;
       }
 
-      const hasConflict = findActiveBookingConflict(
-        bookings,
-        selectedSlot.channel,
-        start,
-        candidate,
+      const hasConflict = (selectedSlot.channels ?? [selectedSlot.channel]).some(
+        (channel) =>
+          findActiveBookingConflict(
+            bookings,
+            channel,
+            start,
+            candidate,
+          ),
       );
 
       if (hasConflict) {
