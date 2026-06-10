@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useRef, type CSSProperties } from 'react';
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import {
   formatShortDateLabelForLanguage,
 } from '../lib/i18n';
@@ -36,6 +36,13 @@ type WeeklyScheduleProps = {
   onShiftWeek: (direction: number) => void;
 };
 
+type DragSelection = {
+  channel: Channel;
+  dateKey: string;
+  startHour: number;
+  endHour: number;
+};
+
 export function WeeklySchedule({
   anchorDate,
   now,
@@ -48,6 +55,10 @@ export function WeeklySchedule({
   const { copy, language } = useLanguage();
   const hourRowRefs = useRef<Record<number, HTMLTableRowElement | null>>({});
   const previousHourRef = useRef<number | null>(null);
+  const suppressClickRef = useRef(false);
+  const [dragSelection, setDragSelection] = useState<DragSelection | null>(
+    null,
+  );
   const weekDates = getWeekDates(anchorDate);
   const currentHour = now.getHours();
   const hourGroups = useMemo(
@@ -79,6 +90,72 @@ export function WeeklySchedule({
     window.scrollTo({ top: nextTop, behavior });
     previousHourRef.current = currentHour;
   }, [anchorDate, currentHour]);
+
+  function isSlotSelectable(date: Date, channel: Channel, hour: number) {
+    const slotStart = setHour(date, hour);
+    const slotEnd = addHours(slotStart, 1);
+    const slotDateKey = toDateKey(slotStart);
+    const activeBooking = findActiveBookingConflict(
+      bookings,
+      channel,
+      slotStart,
+      slotEnd,
+    );
+
+    return (
+      !activeBooking &&
+      !blockedDates.includes(slotDateKey) &&
+      isStartWithinBookingWindow(slotStart, settings, now)
+    );
+  }
+
+  function isDragRangeSelectable(
+    date: Date,
+    channel: Channel,
+    startHour: number,
+    endHour: number,
+  ) {
+    const firstHour = Math.min(startHour, endHour);
+    const lastHour = Math.max(startHour, endHour);
+
+    for (let hour = firstHour; hour <= lastHour; hour += 1) {
+      if (!isSlotSelectable(date, channel, hour)) {
+        return false;
+      }
+    }
+
+    return true;
+  }
+
+  function commitDragSelection(selection: DragSelection | null) {
+    if (!selection) {
+      return;
+    }
+
+    const selectedDate = weekDates.find(
+      (date) => toDateKey(date) === selection.dateKey,
+    );
+
+    if (!selectedDate) {
+      setDragSelection(null);
+      return;
+    }
+
+    const firstHour = Math.min(selection.startHour, selection.endHour);
+    const lastHour = Math.max(selection.startHour, selection.endHour);
+
+    onSelectSlot({
+      channel: selection.channel,
+      startAt: toDateTimeLocal(setHour(selectedDate, firstHour)),
+      endAt: toDateTimeLocal(setHour(selectedDate, lastHour + 1)),
+    });
+    suppressClickRef.current = true;
+    setDragSelection(null);
+
+    window.setTimeout(() => {
+      suppressClickRef.current = false;
+    }, 0);
+  }
 
   return (
     <div className="schedule-shell">
@@ -184,6 +261,20 @@ export function WeeklySchedule({
                       now,
                     );
                     const selectable = !activeBooking && !inBlockedDate && inWindow;
+                    const inDragSelection =
+                      !!dragSelection &&
+                      dragSelection.channel === channel &&
+                      dragSelection.dateKey === slotDateKey &&
+                      group.hour >=
+                        Math.min(
+                          dragSelection.startHour,
+                          dragSelection.endHour,
+                        ) &&
+                      group.hour <=
+                        Math.max(
+                          dragSelection.startHour,
+                          dragSelection.endHour,
+                        );
                     const isSelected =
                       !!selectedSlot &&
                       selectedSlot.channel === channel &&
@@ -202,6 +293,10 @@ export function WeeklySchedule({
                       className += ' selected';
                     }
 
+                    if (inDragSelection) {
+                      className += ' drag-selected';
+                    }
+
                     return (
                       <td
                         key={`${group.hour}-${slotDateKey}-${channel}`}
@@ -216,7 +311,56 @@ export function WeeklySchedule({
                           type="button"
                           className={className}
                           style={channelStyle}
+                          onPointerDown={(event) => {
+                            if (event.button !== 0 || !selectable) {
+                              return;
+                            }
+
+                            event.preventDefault();
+                            setDragSelection({
+                              channel,
+                              dateKey: slotDateKey,
+                              startHour: group.hour,
+                              endHour: group.hour,
+                            });
+                          }}
+                          onPointerEnter={(event) => {
+                            if (
+                              !dragSelection ||
+                              event.buttons !== 1 ||
+                              dragSelection.channel !== channel ||
+                              dragSelection.dateKey !== slotDateKey
+                            ) {
+                              return;
+                            }
+
+                            if (
+                              isDragRangeSelectable(
+                                date,
+                                channel,
+                                dragSelection.startHour,
+                                group.hour,
+                              )
+                            ) {
+                              setDragSelection({
+                                ...dragSelection,
+                                endHour: group.hour,
+                              });
+                            }
+                          }}
+                          onPointerUp={(event) => {
+                            if (!dragSelection) {
+                              return;
+                            }
+
+                            event.preventDefault();
+                            commitDragSelection(dragSelection);
+                          }}
                           onClick={() => {
+                            if (suppressClickRef.current) {
+                              return;
+                            }
+
                             if (visibleBooking) {
                               onCancelBooking?.(visibleBooking);
                               return;
