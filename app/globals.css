@@ -698,7 +698,12 @@ button {
   background: var(--channel-color, rgba(13, 118, 108, 0.88));
   color: var(--text);
   font-weight: 700;
-  cursor: not-allowed;
+  cursor: pointer;
+}
+
+.slot-button.booked:hover {
+  filter: brightness(0.96);
+  box-shadow: inset 0 0 0 2px rgba(21, 50, 42, 0.18);
 }
 
 .slot-button.selected {

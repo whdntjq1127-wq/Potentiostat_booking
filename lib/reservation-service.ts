@@ -1,4 +1,8 @@
 import {
+  createHash,
+  timingSafeEqual,
+} from 'crypto';
+import {
   buildBookingSummary,
   compareBookings,
   compareChangeLogs,
@@ -31,6 +35,7 @@ export type ReservationAction =
         startAt: string;
         endAt: string;
         purpose: string;
+        password: string;
       };
     }
   | {
@@ -46,7 +51,7 @@ export type ReservationAction =
     }
   | {
       type: 'cancelBooking';
-      payload: { id: string; requestedBy: string };
+      payload: { id: string; requestedBy: string; password?: string };
     }
   | {
       type: 'recoverLegacySnapshot';
@@ -69,6 +74,35 @@ const ADMIN_ACTIONS = new Set<ReservationAction['type']>([
   'removeNotice',
   'updateSettings',
 ]);
+const PASSWORD_SALT =
+  process.env.RESERVATION_PASSWORD_SALT ?? 'potentiostat-booking-password-v1';
+
+function hashBookingPassword(password: string) {
+  return createHash('sha256')
+    .update(`${PASSWORD_SALT}:${password}`)
+    .digest('hex');
+}
+
+function verifyBookingPassword(password: string, expectedHash: string) {
+  const actual = Buffer.from(hashBookingPassword(password), 'hex');
+  const expected = Buffer.from(expectedHash, 'hex');
+
+  return actual.length === expected.length && timingSafeEqual(actual, expected);
+}
+
+function stripBookingPassword(booking: Booking): Booking {
+  const { passwordHash: _passwordHash, ...publicBooking } = booking;
+  return publicBooking;
+}
+
+export function toPublicReservationSnapshot(
+  snapshot: ReservationSnapshot,
+): ReservationSnapshot {
+  return {
+    ...snapshot,
+    bookings: snapshot.bookings.map(stripBookingPassword),
+  };
+}
 
 function isHourAlignedRange(start: Date, end: Date) {
   if (
@@ -233,7 +267,7 @@ async function response(
 ): Promise<ReservationActionResponse> {
   return {
     ...result,
-    snapshot: await readReservationSnapshot(),
+    snapshot: toPublicReservationSnapshot(await readReservationSnapshot()),
   };
 }
 
@@ -253,9 +287,11 @@ export async function applyReservationAction(
 
   switch (action.type) {
     case 'addBookings': {
-      const { applicant, channels, startAt, endAt, purpose } = action.payload;
+      const { applicant, channels, startAt, endAt, purpose, password } =
+        action.payload;
       const trimmedApplicant = applicant.trim();
       const trimmedPurpose = purpose.trim();
+      const trimmedPassword = password.trim();
       const selectedChannels = Array.from(new Set(channels));
 
       if (!trimmedApplicant) {
@@ -264,6 +300,13 @@ export async function applyReservationAction(
 
       if (selectedChannels.length === 0) {
         return response({ ok: false, message: 'Select at least one channel.' });
+      }
+
+      if (!trimmedPassword) {
+        return response({
+          ok: false,
+          message: 'Enter a cancellation password for this booking.',
+        });
       }
 
       const range = validateTimeRange(snapshot, startAt, endAt);
@@ -306,6 +349,7 @@ export async function applyReservationAction(
         purpose: trimmedPurpose,
         status: 'active',
         createdAt: createdAtIso,
+        passwordHash: hashBookingPassword(trimmedPassword),
       }));
       const logs = bookings.map((booking) =>
         createLogEntry(
@@ -416,7 +460,7 @@ export async function applyReservationAction(
     }
 
     case 'cancelBooking': {
-      const { id, requestedBy } = action.payload;
+      const { id, requestedBy, password } = action.payload;
       const target = snapshot.bookings.find((booking) => booking.id === id);
 
       if (!target) {
@@ -424,6 +468,23 @@ export async function applyReservationAction(
           ok: false,
           message: 'Could not find the booking to cancel.',
         });
+      }
+
+      if (!options.isAdmin) {
+        if (!target.passwordHash) {
+          return response({
+            ok: false,
+            message:
+              'This booking was created before cancellation passwords were enabled. Ask an admin to cancel it.',
+          });
+        }
+
+        if (!password || !verifyBookingPassword(password, target.passwordHash)) {
+          return response({
+            ok: false,
+            message: 'The cancellation password is incorrect.',
+          });
+        }
       }
 
       const mutation = await store.cancelBooking(

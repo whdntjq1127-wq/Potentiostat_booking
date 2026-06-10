@@ -24,6 +24,7 @@ type BookingDraft = {
   startAt: string;
   endAt: string;
   purpose: string;
+  password: string;
 };
 
 function createDefaultDraft(): BookingDraft {
@@ -35,6 +36,7 @@ function createDefaultDraft(): BookingDraft {
     startAt: toDateTimeLocal(start),
     endAt: toDateTimeLocal(addHours(start, 1)),
     purpose: '',
+    password: '',
   };
 }
 
@@ -87,6 +89,7 @@ export function BookingForm({
                 startAt: toDateTimeLocal(nextStart),
                 endAt: toDateTimeLocal(nextEnd),
                 purpose: '',
+                password: '',
               };
             });
           }
@@ -105,6 +108,23 @@ export function BookingForm({
               }))
             }
             placeholder="e.g. Dr. Kim"
+            required
+          />
+        </div>
+
+        <div className="field full">
+          <label htmlFor="booking-password">Cancellation Password</label>
+          <input
+            id="booking-password"
+            type="password"
+            value={draft.password}
+            onChange={(event) =>
+              setDraft((current) => ({
+                ...current,
+                password: event.target.value,
+              }))
+            }
+            placeholder="Enter a password required to cancel this booking."
             required
           />
         </div>

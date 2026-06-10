@@ -29,6 +29,7 @@ export type Booking = {
   purpose: string;
   status: BookingStatus;
   createdAt: string;
+  passwordHash?: string;
 };
 
 export type ChangeLogEntry = {

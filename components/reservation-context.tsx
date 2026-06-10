@@ -42,6 +42,7 @@ type ReservationContextValue = {
     startAt: string;
     endAt: string;
     purpose: string;
+    password: string;
   }) => Promise<ActionResult>;
   addBookings: (input: {
     applicant: string;
@@ -49,6 +50,7 @@ type ReservationContextValue = {
     startAt: string;
     endAt: string;
     purpose: string;
+    password: string;
   }) => Promise<ActionResult>;
   updateBooking: (input: {
     id: string;
@@ -61,6 +63,7 @@ type ReservationContextValue = {
   cancelBooking: (input: {
     id: string;
     requestedBy: string;
+    password?: string;
   }) => Promise<ActionResult>;
   addBlockedDate: (date: string) => Promise<ActionResult>;
   removeBlockedDate: (date: string) => Promise<ActionResult>;
@@ -262,6 +265,7 @@ export function ReservationProvider({ children }: { children: ReactNode }) {
           startAt: input.startAt,
           endAt: input.endAt,
           purpose: input.purpose,
+          password: input.password,
         }),
       addBooking: (input) =>
         runAction('addBookings', {
@@ -270,6 +274,7 @@ export function ReservationProvider({ children }: { children: ReactNode }) {
           startAt: input.startAt,
           endAt: input.endAt,
           purpose: input.purpose,
+          password: input.password,
         }),
       updateBooking: (input) =>
         runAction('updateBooking', {
@@ -284,6 +289,7 @@ export function ReservationProvider({ children }: { children: ReactNode }) {
         runAction('cancelBooking', {
           id: input.id,
           requestedBy: input.requestedBy,
+          password: input.password,
         }),
       addBlockedDate: (date) => runAction('addBlockedDate', { date }),
       removeBlockedDate: (date) => runAction('removeBlockedDate', { date }),

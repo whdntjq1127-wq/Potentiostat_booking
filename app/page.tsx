@@ -21,6 +21,7 @@ import {
   addHours,
   getLatestAllowedEnd,
   toDateKey,
+  type Booking,
   type Channel,
 } from '../lib/reservation-data';
 
@@ -32,7 +33,7 @@ type EndOption = {
 };
 
 export default function Home() {
-  const { ready, addBookings, bookings, blockedDates, settings } =
+  const { ready, addBookings, bookings, blockedDates, settings, cancelBooking } =
     useReservation();
   const { copy, language } = useLanguage();
   const [mounted, setMounted] = useState(false);
@@ -42,7 +43,16 @@ export default function Home() {
   const [selectedChannels, setSelectedChannels] = useState<Channel[]>([]);
   const [applicant, setApplicant] = useState('');
   const [purpose, setPurpose] = useState('');
+  const [bookingPassword, setBookingPassword] = useState('');
   const [endAt, setEndAt] = useState('');
+  const [cancellingBooking, setCancellingBooking] = useState<Booking | null>(
+    null,
+  );
+  const [cancelPassword, setCancelPassword] = useState('');
+  const [cancelMessage, setCancelMessage] = useState<{
+    ok: boolean;
+    text: string;
+  } | null>(null);
   const [message, setMessage] = useState<{
     ok: boolean;
     text: string;
@@ -94,6 +104,7 @@ export default function Home() {
     setSelectedChannels([selectedSlot.channel]);
     setApplicant('');
     setPurpose('');
+    setBookingPassword('');
     setEndAt(selectedSlot.endAt);
   }, [selectedSlot]);
 
@@ -230,7 +241,8 @@ export default function Home() {
     selectedChannels.length > 0
       ? selectedChannels.join(', ')
       : copy.home.noChannelSelected;
-  const canSaveBooking = selectedChannels.length > 0 && !!endAt;
+  const canSaveBooking =
+    selectedChannels.length > 0 && !!endAt && !!bookingPassword.trim();
   const toggleChannel = (channel: Channel) => {
     const availability = channelAvailability.find(
       (item) => item.channel === channel,
@@ -284,6 +296,12 @@ export default function Home() {
             onSelectSlot={(slot) => {
               setSelectedSlot(slot);
               setMessage(null);
+            }}
+            onCancelBooking={(booking) => {
+              setCancellingBooking(booking);
+              setCancelPassword('');
+              setCancelMessage(null);
+              setSelectedSlot(null);
             }}
             onShiftWeek={(direction) =>
               setWeekAnchor((current) =>
@@ -339,6 +357,7 @@ export default function Home() {
                   startAt: selectedSlot.startAt,
                   endAt,
                   purpose,
+                  password: bookingPassword,
                 });
 
                 setMessage({ ok: result.ok, text: result.message });
@@ -348,6 +367,7 @@ export default function Home() {
                   setSelectedChannels([]);
                   setApplicant('');
                   setPurpose('');
+                  setBookingPassword('');
                   setEndAt('');
                 }
               }}
@@ -360,6 +380,18 @@ export default function Home() {
                   value={applicant}
                   onChange={(event) => setApplicant(event.target.value)}
                   placeholder={copy.home.applicantPlaceholder}
+                  required
+                />
+              </div>
+
+              <div className="field full">
+                <label htmlFor="modal-password">Cancellation Password</label>
+                <input
+                  id="modal-password"
+                  type="password"
+                  value={bookingPassword}
+                  onChange={(event) => setBookingPassword(event.target.value)}
+                  placeholder="This password is required when cancelling the booking."
                   required
                 />
               </div>
@@ -481,6 +513,122 @@ export default function Home() {
                 </button>
               </div>
             </form>
+          </section>
+        </div>
+      ) : null}
+
+      {cancellingBooking ? (
+        <div className="modal-overlay" onClick={() => setCancellingBooking(null)}>
+          <section
+            className="modal-card cancel-modal-card"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="section-head">
+              <div>
+                <div className="eyebrow">Cancel Booking</div>
+                <h2 className="section-title">Cancel this reserved slot</h2>
+              </div>
+              <button
+                type="button"
+                className="button-ghost"
+                onClick={() => setCancellingBooking(null)}
+              >
+                Close
+              </button>
+            </div>
+
+            <div
+              className="reservation-card channel-card section"
+              style={
+                {
+                  '--channel-color': getChannelColor(cancellingBooking.channel),
+                } as CSSProperties
+              }
+            >
+              <div className="card-head">
+                <div>
+                  <strong>
+                    {cancellingBooking.applicant} · {cancellingBooking.channel}
+                  </strong>
+                  <div className="muted">
+                    {formatDateTimeLabelForLanguage(
+                      cancellingBooking.startAt,
+                      language,
+                    )}{' '}
+                    -{' '}
+                    {formatDateTimeLabelForLanguage(
+                      cancellingBooking.endAt,
+                      language,
+                    )}
+                  </div>
+                </div>
+                <span className="channel-badge">
+                  {cancellingBooking.channel}
+                </span>
+              </div>
+              <div className="muted">
+                {cancellingBooking.purpose || 'No memo was entered.'}
+              </div>
+            </div>
+
+            <form
+              className="form-grid section"
+              onSubmit={async (event) => {
+                event.preventDefault();
+                const result = await cancelBooking({
+                  id: cancellingBooking.id,
+                  requestedBy: cancellingBooking.applicant,
+                  password: cancelPassword,
+                });
+
+                setCancelMessage({ ok: result.ok, text: result.message });
+
+                if (result.ok) {
+                  setMessage({ ok: true, text: result.message });
+                  setCancellingBooking(null);
+                  setCancelPassword('');
+                }
+              }}
+            >
+              <div className="field full">
+                <label htmlFor="cancel-password">Cancellation Password</label>
+                <input
+                  id="cancel-password"
+                  type="password"
+                  value={cancelPassword}
+                  onChange={(event) => setCancelPassword(event.target.value)}
+                  placeholder="Enter the password used when this booking was created."
+                  required
+                />
+              </div>
+
+              <div className="action-row">
+                <button
+                  className="button-danger"
+                  type="submit"
+                  disabled={!cancelPassword.trim()}
+                >
+                  Cancel Booking
+                </button>
+                <button
+                  type="button"
+                  className="button-ghost"
+                  onClick={() => setCancellingBooking(null)}
+                >
+                  Keep Booking
+                </button>
+              </div>
+            </form>
+
+            {cancelMessage ? (
+              <div
+                className={`inline-message section ${
+                  cancelMessage.ok ? 'success' : 'error'
+                }`}
+              >
+                {cancelMessage.text}
+              </div>
+            ) : null}
           </section>
         </div>
       ) : null}

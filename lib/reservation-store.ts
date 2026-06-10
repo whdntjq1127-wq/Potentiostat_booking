@@ -22,6 +22,7 @@ type BookingRow = {
   purpose: string | null;
   status: Booking['status'];
   created_at: string;
+  password_hash?: string | null;
 };
 
 type ChangeLogRow = {
@@ -131,6 +132,7 @@ function toBookingRow(booking: Booking) {
     purpose: booking.purpose,
     status: booking.status,
     created_at: booking.createdAt,
+    password_hash: booking.passwordHash ?? null,
   };
 }
 
@@ -144,6 +146,7 @@ function fromBookingRow(row: BookingRow): Booking {
     purpose: row.purpose ?? '',
     status: row.status,
     createdAt: row.created_at,
+    passwordHash: row.password_hash ?? undefined,
   };
 }
 

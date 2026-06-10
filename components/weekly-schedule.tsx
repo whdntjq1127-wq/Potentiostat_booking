@@ -9,6 +9,7 @@ import { useLanguage } from './language-context';
 import {
   CHANNELS,
   addHours,
+  type Booking,
   findActiveBookingConflict,
   getChannelColor,
   getChannelSoftColor,
@@ -31,6 +32,7 @@ type WeeklyScheduleProps = {
   now: Date;
   selectedSlot: SelectedSlot | null;
   onSelectSlot: (slot: SelectedSlot) => void;
+  onCancelBooking?: (booking: Booking) => void;
   onShiftWeek: (direction: number) => void;
 };
 
@@ -39,6 +41,7 @@ export function WeeklySchedule({
   now,
   selectedSlot,
   onSelectSlot,
+  onCancelBooking,
   onShiftWeek,
 }: WeeklyScheduleProps) {
   const { bookings, blockedDates, settings } = useReservation();
@@ -213,16 +216,21 @@ export function WeeklySchedule({
                           type="button"
                           className={className}
                           style={channelStyle}
-                          onClick={() =>
-                            selectable
-                              ? onSelectSlot({
-                                  channel,
-                                  startAt: toDateTimeLocal(slotStart),
-                                  endAt: toDateTimeLocal(slotEnd),
-                                })
-                              : undefined
-                          }
-                          disabled={!selectable}
+                          onClick={() => {
+                            if (visibleBooking) {
+                              onCancelBooking?.(visibleBooking);
+                              return;
+                            }
+
+                            if (selectable) {
+                              onSelectSlot({
+                                channel,
+                                startAt: toDateTimeLocal(slotStart),
+                                endAt: toDateTimeLocal(slotEnd),
+                              });
+                            }
+                          }}
+                          disabled={!selectable && !visibleBooking}
                           title={
                             visibleBooking
                               ? copy.schedule.bookedByTitle(

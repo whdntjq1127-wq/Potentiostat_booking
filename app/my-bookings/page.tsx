@@ -26,6 +26,9 @@ export default function MyBookingsPage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editDraft, setEditDraft] = useState<EditDraft | null>(null);
   const [editMessage, setEditMessage] = useState<string | null>(null);
+  const [cancelPasswords, setCancelPasswords] = useState<
+    Record<string, string>
+  >({});
 
   const filtered = useMemo(() => {
     const trimmed = query.trim().toLowerCase();
@@ -142,12 +145,40 @@ export default function MyBookingsPage() {
                         const result = await cancelBooking({
                           id: booking.id,
                           requestedBy: query.trim() || booking.applicant,
+                          password: cancelPasswords[booking.id] ?? '',
                         });
                         setEditMessage(result.message);
+                        if (result.ok) {
+                          setCancelPasswords((current) => ({
+                            ...current,
+                            [booking.id]: '',
+                          }));
+                        }
                       }}
+                      disabled={!cancelPasswords[booking.id]?.trim()}
                     >
                       Cancel Booking
                     </button>
+                  </div>
+                ) : null}
+
+                {booking.status === 'active' ? (
+                  <div className="field">
+                    <label htmlFor={`cancel-password-${booking.id}`}>
+                      Cancellation Password
+                    </label>
+                    <input
+                      id={`cancel-password-${booking.id}`}
+                      type="password"
+                      value={cancelPasswords[booking.id] ?? ''}
+                      onChange={(event) =>
+                        setCancelPasswords((current) => ({
+                          ...current,
+                          [booking.id]: event.target.value,
+                        }))
+                      }
+                      placeholder="Enter the password used when booking."
+                    />
                   </div>
                 ) : null}
 

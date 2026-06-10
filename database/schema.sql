@@ -12,6 +12,9 @@ create table if not exists pb_bookings (
   check (end_at > start_at)
 );
 
+alter table pb_bookings
+  add column if not exists password_hash text;
+
 do $$
 begin
   if not exists (
