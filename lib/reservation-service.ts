@@ -35,7 +35,7 @@ export type ReservationAction =
         startAt: string;
         endAt: string;
         purpose: string;
-        password: string;
+        password?: string;
       };
     }
   | {
@@ -291,7 +291,7 @@ export async function applyReservationAction(
         action.payload;
       const trimmedApplicant = applicant.trim();
       const trimmedPurpose = purpose.trim();
-      const trimmedPassword = password.trim();
+      const trimmedPassword = (password ?? '').trim();
       const selectedChannels = Array.from(new Set(channels));
 
       if (!trimmedApplicant) {
@@ -300,13 +300,6 @@ export async function applyReservationAction(
 
       if (selectedChannels.length === 0) {
         return response({ ok: false, message: 'Select at least one channel.' });
-      }
-
-      if (!trimmedPassword) {
-        return response({
-          ok: false,
-          message: 'Enter a cancellation password for this booking.',
-        });
       }
 
       const range = validateTimeRange(snapshot, startAt, endAt);
@@ -349,7 +342,9 @@ export async function applyReservationAction(
         purpose: trimmedPurpose,
         status: 'active',
         createdAt: createdAtIso,
-        passwordHash: hashBookingPassword(trimmedPassword),
+        passwordHash: trimmedPassword
+          ? hashBookingPassword(trimmedPassword)
+          : undefined,
       }));
       const logs = bookings.map((booking) =>
         createLogEntry(
@@ -470,21 +465,15 @@ export async function applyReservationAction(
         });
       }
 
-      if (!options.isAdmin) {
-        if (!target.passwordHash) {
-          return response({
-            ok: false,
-            message:
-              'This booking was created before cancellation passwords were enabled. Ask an admin to cancel it.',
-          });
-        }
-
-        if (!password || !verifyBookingPassword(password, target.passwordHash)) {
+      if (
+        !options.isAdmin &&
+        target.passwordHash &&
+        (!password || !verifyBookingPassword(password, target.passwordHash))
+      ) {
           return response({
             ok: false,
             message: 'The cancellation password is incorrect.',
           });
-        }
       }
 
       const mutation = await store.cancelBooking(

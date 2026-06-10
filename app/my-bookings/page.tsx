@@ -148,14 +148,13 @@ export default function MyBookingsPage() {
                           password: cancelPasswords[booking.id] ?? '',
                         });
                         setEditMessage(result.message);
-                        if (result.ok) {
-                          setCancelPasswords((current) => ({
-                            ...current,
-                            [booking.id]: '',
-                          }));
-                        }
-                      }}
-                      disabled={!cancelPasswords[booking.id]?.trim()}
+                      if (result.ok) {
+                        setCancelPasswords((current) => ({
+                          ...current,
+                          [booking.id]: '',
+                        }));
+                      }
+                    }}
                     >
                       Cancel Booking
                     </button>
@@ -165,7 +164,7 @@ export default function MyBookingsPage() {
                 {booking.status === 'active' ? (
                   <div className="field">
                     <label htmlFor={`cancel-password-${booking.id}`}>
-                      Cancellation Password
+                      Cancellation Password (if set)
                     </label>
                     <input
                       id={`cancel-password-${booking.id}`}
@@ -177,7 +176,7 @@ export default function MyBookingsPage() {
                           [booking.id]: event.target.value,
                         }))
                       }
-                      placeholder="Enter the password used when booking."
+                      placeholder="Leave blank if this booking has no password."
                     />
                   </div>
                 ) : null}

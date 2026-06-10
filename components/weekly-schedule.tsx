@@ -34,15 +34,18 @@ type WeeklyScheduleProps = {
   selectedSlot: SelectedSlot | null;
   onSelectSlot: (slot: SelectedSlot) => void;
   onCancelBooking?: (booking: Booking) => void;
+  onCancelBookings?: (bookings: Booking[]) => void;
   onShiftWeek: (direction: number) => void;
 };
 
 type DragSelection = {
+  mode: 'reserve' | 'cancel';
   dateKey: string;
   startChannel: Channel;
   endChannel: Channel;
   startHour: number;
   endHour: number;
+  bookingGroupKey?: string;
 };
 
 export function WeeklySchedule({
@@ -51,6 +54,7 @@ export function WeeklySchedule({
   selectedSlot,
   onSelectSlot,
   onCancelBooking,
+  onCancelBookings,
   onShiftWeek,
 }: WeeklyScheduleProps) {
   const { bookings, blockedDates, settings } = useReservation();
@@ -93,16 +97,63 @@ export function WeeklySchedule({
     previousHourRef.current = currentHour;
   }, [anchorDate, currentHour]);
 
-  function isSlotSelectable(date: Date, channel: Channel, hour: number) {
+  function getActiveBooking(date: Date, channel: Channel, hour: number) {
     const slotStart = setHour(date, hour);
     const slotEnd = addHours(slotStart, 1);
-    const slotDateKey = toDateKey(slotStart);
-    const activeBooking = findActiveBookingConflict(
+    return findActiveBookingConflict(
       bookings,
       channel,
       slotStart,
       slotEnd,
     );
+  }
+
+  function getBookingGroupKey(booking: Booking) {
+    return [
+      booking.applicant,
+      booking.startAt,
+      booking.endAt,
+      booking.purpose,
+      booking.createdAt,
+    ].join('|');
+  }
+
+  function getBookingsInDragRange(selection: DragSelection, date: Date) {
+    const firstHour = Math.min(selection.startHour, selection.endHour);
+    const lastHour = Math.max(selection.startHour, selection.endHour);
+    const firstChannelIndex = Math.min(
+      CHANNELS.indexOf(selection.startChannel),
+      CHANNELS.indexOf(selection.endChannel),
+    );
+    const lastChannelIndex = Math.max(
+      CHANNELS.indexOf(selection.startChannel),
+      CHANNELS.indexOf(selection.endChannel),
+    );
+    const uniqueBookings = new Map<string, Booking>();
+
+    for (
+      let channelIndex = firstChannelIndex;
+      channelIndex <= lastChannelIndex;
+      channelIndex += 1
+    ) {
+      const channel = CHANNELS[channelIndex];
+
+      for (let hour = firstHour; hour <= lastHour; hour += 1) {
+        const booking = getActiveBooking(date, channel, hour);
+
+        if (booking) {
+          uniqueBookings.set(booking.id, booking);
+        }
+      }
+    }
+
+    return [...uniqueBookings.values()];
+  }
+
+  function isSlotSelectable(date: Date, channel: Channel, hour: number) {
+    const slotStart = setHour(date, hour);
+    const slotDateKey = toDateKey(slotStart);
+    const activeBooking = getActiveBooking(date, channel, hour);
 
     return (
       !activeBooking &&
@@ -146,6 +197,44 @@ export function WeeklySchedule({
     return true;
   }
 
+  function isCancelDragRangeSelectable(
+    date: Date,
+    startChannel: Channel,
+    endChannel: Channel,
+    startHour: number,
+    endHour: number,
+    bookingGroupKey: string,
+  ) {
+    const firstChannelIndex = Math.min(
+      CHANNELS.indexOf(startChannel),
+      CHANNELS.indexOf(endChannel),
+    );
+    const lastChannelIndex = Math.max(
+      CHANNELS.indexOf(startChannel),
+      CHANNELS.indexOf(endChannel),
+    );
+    const firstHour = Math.min(startHour, endHour);
+    const lastHour = Math.max(startHour, endHour);
+
+    for (
+      let channelIndex = firstChannelIndex;
+      channelIndex <= lastChannelIndex;
+      channelIndex += 1
+    ) {
+      const channel = CHANNELS[channelIndex];
+
+      for (let hour = firstHour; hour <= lastHour; hour += 1) {
+        const booking = getActiveBooking(date, channel, hour);
+
+        if (!booking || getBookingGroupKey(booking) !== bookingGroupKey) {
+          return false;
+        }
+      }
+    }
+
+    return true;
+  }
+
   function commitDragSelection(selection: DragSelection | null) {
     if (!selection) {
       return;
@@ -157,6 +246,22 @@ export function WeeklySchedule({
 
     if (!selectedDate) {
       setDragSelection(null);
+      return;
+    }
+
+    if (selection.mode === 'cancel') {
+      const selectedBookings = getBookingsInDragRange(selection, selectedDate);
+
+      if (selectedBookings.length > 0) {
+        onCancelBookings?.(selectedBookings);
+      }
+
+      suppressClickRef.current = true;
+      setDragSelection(null);
+
+      window.setTimeout(() => {
+        suppressClickRef.current = false;
+      }, 0);
       return;
     }
 
@@ -278,12 +383,7 @@ export function WeeklySchedule({
                     const slotEnd = addHours(slotStart, 1);
                     const slotDateKey = toDateKey(slotStart);
 
-                    const activeBooking = findActiveBookingConflict(
-                      bookings,
-                      channel,
-                      slotStart,
-                      slotEnd,
-                    );
+                    const activeBooking = getActiveBooking(date, channel, group.hour);
 
                     const visibleBooking = activeBooking ?? null;
                     const inBlockedDate = blockedDates.includes(slotDateKey);
@@ -335,7 +435,10 @@ export function WeeklySchedule({
                     }
 
                     if (inDragSelection) {
-                      className += ' drag-selected';
+                      className +=
+                        dragSelection.mode === 'cancel'
+                          ? ' cancel-drag-selected'
+                          : ' drag-selected';
                     }
 
                     return (
@@ -353,12 +456,32 @@ export function WeeklySchedule({
                           className={className}
                           style={channelStyle}
                           onPointerDown={(event) => {
-                            if (event.button !== 0 || !selectable) {
+                            if (event.button !== 0) {
+                              return;
+                            }
+
+                            if (visibleBooking) {
+                              event.preventDefault();
+                              setDragSelection({
+                                mode: 'cancel',
+                                dateKey: slotDateKey,
+                                startChannel: channel,
+                                endChannel: channel,
+                                startHour: group.hour,
+                                endHour: group.hour,
+                                bookingGroupKey:
+                                  getBookingGroupKey(visibleBooking),
+                              });
+                              return;
+                            }
+
+                            if (!selectable) {
                               return;
                             }
 
                             event.preventDefault();
                             setDragSelection({
+                              mode: 'reserve',
                               dateKey: slotDateKey,
                               startChannel: channel,
                               endChannel: channel,
@@ -375,15 +498,26 @@ export function WeeklySchedule({
                               return;
                             }
 
-                            if (
-                              isDragRangeSelectable(
-                                date,
-                                dragSelection.startChannel,
-                                channel,
-                                dragSelection.startHour,
-                                group.hour,
-                              )
-                            ) {
+                            const canExtend =
+                              dragSelection.mode === 'cancel'
+                                ? !!dragSelection.bookingGroupKey &&
+                                  isCancelDragRangeSelectable(
+                                    date,
+                                    dragSelection.startChannel,
+                                    channel,
+                                    dragSelection.startHour,
+                                    group.hour,
+                                    dragSelection.bookingGroupKey,
+                                  )
+                                : isDragRangeSelectable(
+                                    date,
+                                    dragSelection.startChannel,
+                                    channel,
+                                    dragSelection.startHour,
+                                    group.hour,
+                                  );
+
+                            if (canExtend) {
                               setDragSelection({
                                 ...dragSelection,
                                 endChannel: channel,

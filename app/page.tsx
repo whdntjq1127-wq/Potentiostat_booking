@@ -45,9 +45,7 @@ export default function Home() {
   const [purpose, setPurpose] = useState('');
   const [bookingPassword, setBookingPassword] = useState('');
   const [endAt, setEndAt] = useState('');
-  const [cancellingBooking, setCancellingBooking] = useState<Booking | null>(
-    null,
-  );
+  const [cancellingBookings, setCancellingBookings] = useState<Booking[]>([]);
   const [cancelPassword, setCancelPassword] = useState('');
   const [cancelMessage, setCancelMessage] = useState<{
     ok: boolean;
@@ -105,7 +103,6 @@ export default function Home() {
     setApplicant('');
     setPurpose('');
     setBookingPassword('');
-    setEndAt(selectedSlot.endAt);
   }, [selectedSlot]);
 
   const availableEndOptions = useMemo<EndOption[]>(() => {
@@ -163,10 +160,22 @@ export default function Home() {
       return;
     }
 
-    if (!availableEndOptions.some((option) => option.value === endAt)) {
-      setEndAt(availableEndOptions[0].value);
-    }
-  }, [availableEndOptions, endAt, selectedSlot]);
+    setEndAt((current) => {
+      if (availableEndOptions.some((option) => option.value === current)) {
+        return current;
+      }
+
+      if (
+        availableEndOptions.some(
+          (option) => option.value === selectedSlot.endAt,
+        )
+      ) {
+        return selectedSlot.endAt;
+      }
+
+      return availableEndOptions[0].value;
+    });
+  }, [availableEndOptions, selectedSlot]);
 
   const selectedRange = useMemo(() => {
     if (!selectedSlot || !endAt) {
@@ -244,8 +253,11 @@ export default function Home() {
     selectedChannels.length > 0
       ? selectedChannels.join(', ')
       : copy.home.noChannelSelected;
-  const canSaveBooking =
-    selectedChannels.length > 0 && !!endAt && !!bookingPassword.trim();
+  const cancellingBooking = cancellingBookings[0] ?? null;
+  const setCancellingBooking = (booking: Booking | null) => {
+    setCancellingBookings(booking ? [booking] : []);
+  };
+  const canSaveBooking = selectedChannels.length > 0 && !!endAt;
   const toggleChannel = (channel: Channel) => {
     const availability = channelAvailability.find(
       (item) => item.channel === channel,
@@ -301,7 +313,13 @@ export default function Home() {
               setMessage(null);
             }}
             onCancelBooking={(booking) => {
-              setCancellingBooking(booking);
+              setCancellingBookings([booking]);
+              setCancelPassword('');
+              setCancelMessage(null);
+              setSelectedSlot(null);
+            }}
+            onCancelBookings={(nextBookings) => {
+              setCancellingBookings(nextBookings);
               setCancelPassword('');
               setCancelMessage(null);
               setSelectedSlot(null);
@@ -388,14 +406,15 @@ export default function Home() {
               </div>
 
               <div className="field full">
-                <label htmlFor="modal-password">Cancellation Password</label>
+                <label htmlFor="modal-password">
+                  Cancellation Password (optional)
+                </label>
                 <input
                   id="modal-password"
                   type="password"
                   value={bookingPassword}
                   onChange={(event) => setBookingPassword(event.target.value)}
-                  placeholder="This password is required when cancelling the booking."
-                  required
+                  placeholder="Leave blank to allow cancellation without a password."
                 />
               </div>
 
@@ -574,15 +593,43 @@ export default function Home() {
               </div>
             </div>
 
+            {cancellingBookings.length > 1 ? (
+              <div className="inline-note section">
+                {cancellingBookings.length} selected booking blocks will be
+                cancelled with the same password.
+              </div>
+            ) : null}
+
             <form
               className="form-grid section"
               onSubmit={async (event) => {
                 event.preventDefault();
-                const result = await cancelBooking({
-                  id: cancellingBooking.id,
-                  requestedBy: cancellingBooking.applicant,
-                  password: cancelPassword,
-                });
+                const results = [];
+
+                for (const booking of cancellingBookings) {
+                  results.push(
+                    await cancelBooking({
+                      id: booking.id,
+                      requestedBy: booking.applicant,
+                      password: cancelPassword,
+                    }),
+                  );
+                }
+
+                const failed = results.filter((item) => !item.ok);
+                const result =
+                  failed.length > 0
+                    ? {
+                        ok: false,
+                        message: failed.map((item) => item.message).join(' '),
+                      }
+                    : {
+                        ok: true,
+                        message:
+                          cancellingBookings.length === 1
+                            ? results[0].message
+                            : `${cancellingBookings.length} bookings were cancelled.`,
+                      };
 
                 setCancelMessage({ ok: result.ok, text: result.message });
 
@@ -594,23 +641,20 @@ export default function Home() {
               }}
             >
               <div className="field full">
-                <label htmlFor="cancel-password">Cancellation Password</label>
+                <label htmlFor="cancel-password">
+                  Cancellation Password (if set)
+                </label>
                 <input
                   id="cancel-password"
                   type="password"
                   value={cancelPassword}
                   onChange={(event) => setCancelPassword(event.target.value)}
-                  placeholder="Enter the password used when this booking was created."
-                  required
+                  placeholder="Leave blank if this booking was created without a password."
                 />
               </div>
 
               <div className="action-row">
-                <button
-                  className="button-danger"
-                  type="submit"
-                  disabled={!cancelPassword.trim()}
-                >
+                <button className="button-danger" type="submit">
                   Cancel Booking
                 </button>
                 <button

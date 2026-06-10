@@ -42,7 +42,7 @@ type ReservationContextValue = {
     startAt: string;
     endAt: string;
     purpose: string;
-    password: string;
+    password?: string;
   }) => Promise<ActionResult>;
   addBookings: (input: {
     applicant: string;
@@ -50,7 +50,7 @@ type ReservationContextValue = {
     startAt: string;
     endAt: string;
     purpose: string;
-    password: string;
+    password?: string;
   }) => Promise<ActionResult>;
   updateBooking: (input: {
     id: string;

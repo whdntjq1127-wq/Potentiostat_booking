@@ -123,7 +123,7 @@ function normalizeLocalDateTime(value: string) {
 }
 
 function toBookingRow(booking: Booking) {
-  return {
+  const row: BookingRow = {
     id: booking.id,
     applicant: booking.applicant,
     channel: booking.channel,
@@ -132,8 +132,13 @@ function toBookingRow(booking: Booking) {
     purpose: booking.purpose,
     status: booking.status,
     created_at: booking.createdAt,
-    password_hash: booking.passwordHash ?? null,
   };
+
+  if (booking.passwordHash) {
+    row.password_hash = booking.passwordHash;
+  }
+
+  return row;
 }
 
 function fromBookingRow(row: BookingRow): Booking {

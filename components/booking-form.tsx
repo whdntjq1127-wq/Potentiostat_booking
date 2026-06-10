@@ -113,7 +113,7 @@ export function BookingForm({
         </div>
 
         <div className="field full">
-          <label htmlFor="booking-password">Cancellation Password</label>
+          <label htmlFor="booking-password">Cancellation Password (optional)</label>
           <input
             id="booking-password"
             type="password"
@@ -124,8 +124,7 @@ export function BookingForm({
                 password: event.target.value,
               }))
             }
-            placeholder="Enter a password required to cancel this booking."
-            required
+            placeholder="Leave blank to allow cancellation without a password."
           />
         </div>
 
