@@ -324,10 +324,25 @@ export default function Home() {
     <main className="calendar-page">
       <section className="panel board-panel calendar-panel">
           <div className="section-head">
-            <div>
+            <div className="calendar-title-block">
               <div className="eyebrow">{copy.home.weeklyEyebrow}</div>
               <h2 className="section-title">{copy.home.weeklyTitle}</h2>
             </div>
+            {notices.length > 0 ? (
+              <aside className="calendar-notice-panel" aria-label="관리자 공지사항">
+                <div className="calendar-notice-heading">관리자 공지사항</div>
+                <div className="calendar-notice-list">
+                  {notices.map((notice, index) => (
+                    <div
+                      key={`${index}-${notice}`}
+                      className="calendar-notice-entry"
+                    >
+                      {notice}
+                    </div>
+                  ))}
+                </div>
+              </aside>
+            ) : null}
             <div className="rule-summary">
               <span>
                 {copy.home.asOf(formatDateLabelForLanguage(now, language))}

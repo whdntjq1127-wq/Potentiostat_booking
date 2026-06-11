@@ -248,6 +248,48 @@ button {
   padding-inline: clamp(14px, 1.4vw, 26px);
 }
 
+.calendar-title-block {
+  flex: 0 0 auto;
+}
+
+.calendar-notice-panel {
+  flex: 1 1 380px;
+  align-self: stretch;
+  min-width: min(420px, 100%);
+  max-width: 720px;
+  display: grid;
+  gap: 8px;
+  padding: 12px 14px;
+  border: 1px solid rgba(13, 118, 108, 0.18);
+  border-left: 5px solid var(--primary);
+  border-radius: 18px;
+  background:
+    linear-gradient(135deg, rgba(13, 118, 108, 0.1), rgba(255, 255, 255, 0.82)),
+    rgba(255, 255, 255, 0.74);
+}
+
+.calendar-notice-heading {
+  color: var(--primary-strong);
+  font-size: 0.82rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+}
+
+.calendar-notice-list {
+  display: grid;
+  gap: 6px;
+  max-height: 90px;
+  overflow: auto;
+  padding-right: 4px;
+}
+
+.calendar-notice-entry {
+  color: var(--text);
+  font-size: 0.9rem;
+  line-height: 1.45;
+  white-space: pre-wrap;
+}
+
 .eyebrow {
   display: inline-flex;
   align-items: center;
