@@ -32,9 +32,18 @@ type EndOption = {
   timeLabel: string;
 };
 
+const NOTICE_HIDE_DATE_KEY = 'potentiostat-booking-notice-hidden-date';
+
 export default function Home() {
-  const { ready, addBookings, bookings, blockedDates, settings, cancelBooking } =
-    useReservation();
+  const {
+    ready,
+    addBookings,
+    bookings,
+    blockedDates,
+    notices,
+    settings,
+    cancelBooking,
+  } = useReservation();
   const { copy, language } = useLanguage();
   const [mounted, setMounted] = useState(false);
   const [now, setNow] = useState<Date | null>(null);
@@ -55,6 +64,8 @@ export default function Home() {
     ok: boolean;
     text: string;
   } | null>(null);
+  const [showNoticePopup, setShowNoticePopup] = useState(false);
+  const [noticePopupDismissed, setNoticePopupDismissed] = useState(false);
 
   useEffect(() => {
     let intervalId: number | null = null;
@@ -104,6 +115,28 @@ export default function Home() {
     setPurpose('');
     setBookingPassword('');
   }, [selectedSlot]);
+
+  useEffect(() => {
+    if (!ready || !mounted || !now || notices.length === 0) {
+      setShowNoticePopup(false);
+      return;
+    }
+
+    if (noticePopupDismissed) {
+      setShowNoticePopup(false);
+      return;
+    }
+
+    let hiddenDate: string | null = null;
+
+    try {
+      hiddenDate = window.localStorage.getItem(NOTICE_HIDE_DATE_KEY);
+    } catch {
+      hiddenDate = null;
+    }
+
+    setShowNoticePopup(hiddenDate !== toDateKey(now));
+  }, [mounted, noticePopupDismissed, notices, now, ready]);
 
   const availableEndOptions = useMemo<EndOption[]>(() => {
     if (!selectedSlot) {
@@ -258,6 +291,19 @@ export default function Home() {
     setCancellingBookings(booking ? [booking] : []);
   };
   const canSaveBooking = selectedChannels.length > 0 && !!endAt;
+  const closeNoticePopup = () => {
+    setNoticePopupDismissed(true);
+    setShowNoticePopup(false);
+  };
+  const hideNoticeForToday = () => {
+    try {
+      window.localStorage.setItem(NOTICE_HIDE_DATE_KEY, toDateKey(now));
+    } catch {
+      // If localStorage is unavailable, fall back to dismissing for this page.
+    }
+
+    closeNoticePopup();
+  };
   const toggleChannel = (channel: Channel) => {
     const availability = channelAvailability.find(
       (item) => item.channel === channel,
@@ -331,6 +377,58 @@ export default function Home() {
             }
           />
       </section>
+
+      {showNoticePopup ? (
+        <div className="modal-overlay" onClick={closeNoticePopup}>
+          <section
+            className="modal-card notice-popup-card"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="notice-popup-title"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="section-head">
+              <div>
+                <div className="eyebrow">공지사항</div>
+                <h2 className="section-title" id="notice-popup-title">
+                  예약 전 확인해주세요
+                </h2>
+                <p className="muted">
+                  관리자가 등록한 최신 공지사항입니다.
+                </p>
+              </div>
+            </div>
+
+            <div className="notice-popup-list section">
+              {notices.map((notice, index) => (
+                <div
+                  key={`${index}-${notice}`}
+                  className="announcement notice-popup-item"
+                >
+                  {notice}
+                </div>
+              ))}
+            </div>
+
+            <div className="action-row notice-popup-actions">
+              <button
+                type="button"
+                className="button-ghost"
+                onClick={closeNoticePopup}
+              >
+                닫기
+              </button>
+              <button
+                type="button"
+                className="button"
+                onClick={hideNoticeForToday}
+              >
+                오늘 하루동안 보지않기
+              </button>
+            </div>
+          </section>
+        </div>
+      ) : null}
 
       {selectedSlot ? (
         <div className="modal-overlay" onClick={() => setSelectedSlot(null)}>
