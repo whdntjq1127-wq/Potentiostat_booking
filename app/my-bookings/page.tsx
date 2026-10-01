@@ -1,13 +1,17 @@
 'use client';
 
 import type { CSSProperties } from 'react';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useReservation } from '../../components/reservation-context';
 import {
   CHANNELS,
   addHours,
   formatBookingRange,
+  fromDateTimeLocal,
+  getBookingToday,
   getChannelColor,
+  getLatestAllowedEnd,
+  getLatestBookableDate,
   getStatusLabel,
   toDateTimeLocal,
   type Channel,
@@ -21,7 +25,8 @@ type EditDraft = {
 };
 
 export default function MyBookingsPage() {
-  const { bookings, cancelBooking, ready, updateBooking } = useReservation();
+  const { bookings, cancelBooking, ready, settings, updateBooking } = useReservation();
+  const [now, setNow] = useState(() => new Date());
   const [query, setQuery] = useState('');
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editDraft, setEditDraft] = useState<EditDraft | null>(null);
@@ -29,6 +34,33 @@ export default function MyBookingsPage() {
   const [cancelPasswords, setCancelPasswords] = useState<
     Record<string, string>
   >({});
+
+  useEffect(() => {
+    let timer: number;
+    const syncNow = () => {
+      window.clearTimeout(timer);
+      const current = new Date();
+      setNow(current);
+      const delay = (60 - current.getSeconds()) * 1000 - current.getMilliseconds();
+      timer = window.setTimeout(syncNow, delay);
+    };
+    syncNow();
+    window.addEventListener('focus', syncNow);
+    document.addEventListener('visibilitychange', syncNow);
+    return () => {
+      window.clearTimeout(timer);
+      window.removeEventListener('focus', syncNow);
+      document.removeEventListener('visibilitychange', syncNow);
+    };
+  }, []);
+
+  const editStart = editDraft ? fromDateTimeLocal(editDraft.startAt) : null;
+  const firstStart = toDateTimeLocal(getBookingToday(now));
+  const lastStart = toDateTimeLocal(addHours(getLatestBookableDate(settings, now), 23));
+  const firstEnd = editStart ? toDateTimeLocal(addHours(editStart, 1)) : undefined;
+  const lastEnd = editStart
+    ? toDateTimeLocal(getLatestAllowedEnd(editStart, settings, now))
+    : undefined;
 
   const filtered = useMemo(() => {
     const trimmed = query.trim().toLowerCase();
@@ -230,6 +262,8 @@ export default function MyBookingsPage() {
                         id={`start-${booking.id}`}
                         type="datetime-local"
                         step={3600}
+                        min={firstStart}
+                        max={lastStart}
                         value={editDraft.startAt}
                         onChange={(event) =>
                           setEditDraft((current) =>
@@ -250,9 +284,8 @@ export default function MyBookingsPage() {
                         id={`end-${booking.id}`}
                         type="datetime-local"
                         step={3600}
-                        min={toDateTimeLocal(
-                          addHours(new Date(editDraft.startAt), 1),
-                        )}
+                        min={firstEnd}
+                        max={lastEnd}
                         value={editDraft.endAt}
                         onChange={(event) =>
                           setEditDraft((current) =>
@@ -288,6 +321,7 @@ export default function MyBookingsPage() {
                     <div className="inline-note">
                       Start and end times must use 1-hour increments. Example:
                       13:00-18:00 is allowed, 13:00-18:30 is not.
+                      {' '}Bookings must end by midnight after the last bookable date (Korea time).
                     </div>
 
                     <div className="action-row">

@@ -67,7 +67,7 @@ const BOOKING_DATE_FORMAT = new Intl.DateTimeFormat('en-CA', {
   day: '2-digit',
 });
 
-function getBookingToday(now: Date) {
+export function getBookingToday(now = new Date()) {
   const parts = BOOKING_DATE_FORMAT.formatToParts(now);
   const part = (type: string) => parts.find((item) => item.type === type)!.value;
   // Booking values have no offset: use Korean today's date as a local wall-clock date.
@@ -287,7 +287,7 @@ export function isStartWithinBookingWindow(
   now = new Date(),
 ) {
   const first = getBookingToday(now);
-  const latest = addDays(first, settings.bookingWindowDays);
+  const latest = getLatestBookableDate(settings, now);
   const startDate = startOfDay(start);
 
   return startDate >= first && startDate <= latest;
@@ -297,14 +297,26 @@ export function getLatestBookableDate(
   settings: ReservationSettings,
   now = new Date(),
 ) {
-  return addDays(getBookingToday(now), settings.bookingWindowDays);
+  // Count today as day one; legacy zero-day settings still mean today only.
+  const days = Math.max(1, Math.floor(settings.bookingWindowDays));
+  return addDays(getBookingToday(now), days - 1);
+}
+
+export function getBookingWindowEnd(
+  settings: ReservationSettings,
+  now = new Date(),
+) {
+  return addDays(getLatestBookableDate(settings, now), 1);
 }
 
 export function getLatestAllowedEnd(
   start: Date,
   settings: ReservationSettings,
+  now = new Date(),
 ) {
-  return addHours(start, settings.maxDurationDays * 24);
+  const durationEnd = addHours(start, settings.maxDurationDays * 24);
+  const windowEnd = getBookingWindowEnd(settings, now);
+  return durationEnd < windowEnd ? durationEnd : windowEnd;
 }
 
 export function getBookingExpiryDate(endAt: string) {

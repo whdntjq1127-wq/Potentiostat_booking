@@ -28,7 +28,7 @@ async function run() {
   process.env.SUPABASE_SERVICE_ROLE_KEY = '';
   process.env.RESERVATION_STORE_FILE = '';
   const NativeDate = Date;
-  let clock = '2026-10-01T03:00:00Z';
+  let clock = '2026-10-01T15:00:00Z';
   class TestDate extends NativeDate {
     constructor(...args) {
       if (args.length === 0) super(clock);
@@ -77,20 +77,21 @@ async function run() {
     assert.match(sql, /on conflict \(id\) do nothing/);
   });
   test('today and the whole third day are allowed, fourth day is blocked', () => {
-    for (const start of ['2026-10-01T00:00', '2026-10-04T00:00', '2026-10-04T23:00']) {
+    for (const start of ['2026-10-02T00:00', '2026-10-03T12:00', '2026-10-04T00:00', '2026-10-04T23:00']) {
       assert.equal(data.isStartWithinBookingWindow(new TestDate(start), settings), true, start);
     }
-    for (const start of ['2026-09-30T23:00', '2026-10-05T00:00', '2026-10-05T23:00']) {
+    for (const start of ['2026-10-01T23:00', '2026-10-05T00:00', '2026-10-05T23:00']) {
       assert.equal(data.isStartWithinBookingWindow(new TestDate(start), settings), false, start);
     }
   });
   test('booking window changes at Korean midnight, regardless of machine timezone', () => {
     for (const [instant, lastDay] of [
-      ['2026-09-30T14:59:59Z', '2026-10-03'],
-      ['2026-09-30T15:00:00Z', '2026-10-04'],
-      ['2026-10-01T14:59:59Z', '2026-10-04'],
-      ['2026-10-01T15:00:00Z', '2026-10-05'],
-      ['2026-12-31T15:00:00Z', '2027-01-04'],
+      ['2026-09-30T14:59:59Z', '2026-10-02'],
+      ['2026-09-30T15:00:00Z', '2026-10-03'],
+      ['2026-10-01T15:00:00Z', '2026-10-04'],
+      ['2026-10-02T14:59:59Z', '2026-10-04'],
+      ['2026-10-02T15:00:00Z', '2026-10-05'],
+      ['2026-12-31T15:00:00Z', '2027-01-03'],
     ]) {
       clock = instant;
       assert.equal(data.toDateKey(data.getLatestBookableDate(settings)), lastDay, instant);
@@ -98,9 +99,33 @@ async function run() {
       assert.equal(data.isStartWithinBookingWindow(data.addDays(new TestDate(`${lastDay}T00:00`), 1), settings), false);
     }
   });
-  test('creation accepts a third-day start and allows its end beyond the start window', async () => {
-    const result = await add('2026-10-04T23:00', '2026-10-05T01:00');
+  test('creation allows the last hour ending exactly at the window boundary', async () => {
+    const result = await add('2026-10-04T23:00', '2026-10-05T00:00');
     assert.equal(result.ok, true, result.message);
+  });
+  test('creation rejects an end beyond the open calendar days', async () => {
+    const result = await add('2026-10-04T23:00', '2026-10-05T01:00');
+    assert.equal(result.ok, false);
+    assert.equal(result.snapshot.bookings.length, 0);
+  });
+  test('end options stop at midnight after the last bookable day', () => {
+    const end = data.getLatestAllowedEnd(new TestDate('2026-10-02T12:00'), settings);
+    assert.equal(data.toDateTimeLocal(end), '2026-10-05T00:00');
+  });
+  test('a shorter maximum duration still limits end options', () => {
+    const end = data.getLatestAllowedEnd(new TestDate('2026-10-02T12:00'), { ...settings, maxDurationDays: 1 });
+    assert.equal(data.toDateTimeLocal(end), '2026-10-03T12:00');
+  });
+  test('the next day opens only at Korean midnight', async () => {
+    clock = '2026-10-02T14:59:59Z';
+    assert.equal((await add('2026-10-05T23:00', '2026-10-06T00:00')).ok, false);
+    clock = '2026-10-02T15:00:00Z';
+    assert.equal((await add('2026-10-05T23:00', '2026-10-06T00:00')).ok, true);
+    assert.equal((await add('2026-10-06T00:00', '2026-10-06T01:00')).ok, false);
+  });
+  test('bookings still require whole-hour increments', async () => {
+    const result = await add('2026-10-04T23:00', '2026-10-04T23:30');
+    assert.equal(result.ok, false);
   });
   test('creation rejects a fourth-day start without inserting a booking', async () => {
     const result = await add('2026-10-05T00:00', '2026-10-05T01:00');
@@ -130,6 +155,16 @@ async function run() {
     });
     return applyReservationAction({ type: 'recoverLegacySnapshot', payload: { snapshot: legacy } }, { isAdmin: false });
   }
+  test('editing cannot extend into an unopened calendar day', async () => {
+    const created = await add('2026-10-04T23:00', '2026-10-05T00:00');
+    assert.equal(created.ok, true);
+    const result = await applyReservationAction({ type: 'updateBooking', payload: {
+      id: created.snapshot.bookings[0].id, requestedBy: 'Window Test', channel: 'CH 1',
+      startAt: '2026-10-04T23:00', endAt: '2026-10-05T01:00', purpose: 'Test',
+    } }, { isAdmin: false });
+    assert.equal(result.ok, false);
+    assert.equal(result.snapshot.bookings[0].endAt, '2026-10-05T00:00');
+  });
   test('legacy recovery cannot create a fourth-day booking', async () => {
     const result = await recover('2026-10-05T00:00', '2026-10-05T01:00');
     assert.equal(result.ok, false);
@@ -140,13 +175,48 @@ async function run() {
     assert.equal(result.ok, true, result.message);
     assert.equal(result.snapshot.bookings.length, 1);
   });
+  test('legacy recovery cannot extend beyond the booking window', async () => {
+    const result = await recover('2026-10-04T23:00', '2026-10-05T01:00');
+    assert.equal(result.ok, false);
+    assert.equal(result.snapshot.bookings.length, 0);
+  });
+  test('legacy recovery allows an end exactly at the boundary', async () => {
+    const result = await recover('2026-10-04T23:00', '2026-10-05T00:00');
+    assert.equal(result.ok, true, result.message);
+  });
   test('saved admin window remains configurable', () => {
     assert.equal(data.isStartWithinBookingWindow(new TestDate('2026-10-05T12:00'), { ...settings, bookingWindowDays: 4 }), true);
+    assert.equal(data.isStartWithinBookingWindow(new TestDate('2026-10-06T00:00'), { ...settings, bookingWindowDays: 4 }), false);
+  });
+  test('one bookable day means only today, with compatibility for saved zero', () => {
+    for (const bookingWindowDays of [0, 1]) {
+      const rule = { ...settings, bookingWindowDays };
+      assert.equal(data.isStartWithinBookingWindow(new TestDate('2026-10-02T23:00'), rule), true);
+      assert.equal(data.isStartWithinBookingWindow(new TestDate('2026-10-03T00:00'), rule), false);
+    }
+  });
+  test('admin must save a positive whole number of bookable days', async () => {
+    for (const bookingWindowDays of [0, -1, 1.5]) {
+      const result = await applyReservationAction({ type: 'updateSettings', payload: {
+        ...settings, bookingWindowDays,
+      } }, { isAdmin: true });
+      assert.equal(result.ok, false, String(bookingWindowDays));
+    }
+  });
+  test('new limits do not delete existing bookings beyond the window', async () => {
+    globalThis.__potentiostatReservationSnapshot.bookings.push({
+      id: 'existing-future', applicant: 'Existing', channel: 'CH 2',
+      startAt: '2026-10-06T10:00', endAt: '2026-10-06T11:00',
+      status: 'active', purpose: '', createdAt: clock,
+    });
+    const result = await add('2026-10-04T23:00', '2026-10-05T00:00');
+    assert.equal(result.ok, true);
+    assert.equal(result.snapshot.bookings.some((booking) => booking.id === 'existing-future'), true);
   });
 
   let failures = 0;
   for (const [name, fn] of tests) {
-    clock = '2026-10-01T03:00:00Z';
+    clock = '2026-10-01T15:00:00Z';
     globalThis.__potentiostatReservationSnapshot = emptySnapshot();
     try { await fn(); }
     catch (error) { failures++; console.error(`FAIL (${process.env.TZ}): ${name}\n${error.message}`); }

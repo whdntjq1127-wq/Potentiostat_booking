@@ -119,8 +119,9 @@ export default function AdminPage() {
             <div className="eyebrow">Booking Rules</div>
             <h1 className="section-title">Admin Settings</h1>
             <p className="muted">
-              Adjust the start-date booking window and the maximum usage duration from
-              the selected start time.
+              Bookable days include today (Korea time). For example, 3 opens today,
+              tomorrow, and the following day. All bookings must end by midnight
+              after the last open day, even if the maximum usage duration is longer.
             </p>
           </div>
           <button
@@ -144,11 +145,11 @@ export default function AdminPage() {
           }}
         >
           <div className="field">
-            <label htmlFor="booking-window">Booking Window (days)</label>
+            <label htmlFor="booking-window">Bookable Days (including today)</label>
             <input
               id="booking-window"
               type="number"
-              min={0}
+              min={1}
               value={settingsDraft.bookingWindowDays}
               onChange={(event) =>
                 setSettingsDraft((current) => ({

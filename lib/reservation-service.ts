@@ -10,11 +10,10 @@ import {
   fromDateTimeLocal,
   getBlockedDateInRange,
   getBookingExpiryDate,
+  getBookingWindowEnd,
   getLatestAllowedEnd,
-  getLatestBookableDate,
   isStartWithinBookingWindow,
   pruneExpiredReservationState,
-  startOfDay,
   toDateTimeLocal,
   type Booking,
   type Channel,
@@ -247,7 +246,8 @@ function validateTimeRange(
     };
   }
 
-  if (!isStartWithinBookingWindow(start, snapshot.settings, new Date())) {
+  const now = new Date();
+  if (!isStartWithinBookingWindow(start, snapshot.settings, now)) {
     return {
       ok: false as const,
       message:
@@ -255,7 +255,14 @@ function validateTimeRange(
     };
   }
 
-  if (end > getLatestAllowedEnd(start, snapshot.settings)) {
+  if (end > getBookingWindowEnd(snapshot.settings, now)) {
+    return {
+      ok: false as const,
+      message: 'The end time must not go beyond midnight after the last bookable date (Korea time).',
+    };
+  }
+
+  if (end > getLatestAllowedEnd(start, snapshot.settings, now)) {
     return {
       ok: false as const,
       message: `Maximum usage duration is ${snapshot.settings.maxDurationDays} days.`,
@@ -515,20 +522,22 @@ export async function applyReservationAction(
     case 'recoverLegacySnapshot': {
       const legacy = normalizeLegacySnapshot(action.payload.snapshot);
       const currentIds = new Set(snapshot.bookings.map((booking) => booking.id));
-      const latestStartDate = getLatestBookableDate(snapshot.settings);
+      const windowEnd = getBookingWindowEnd(snapshot.settings);
       const outsideWindow = legacy.bookings.some((booking) => {
         if (currentIds.has(booking.id)) {
           return false;
         }
 
         const start = parseBookingDateTime(booking.startAt);
-        return !start || startOfDay(start) > latestStartDate;
+        const end = parseBookingDateTime(booking.endAt);
+        return !start || !end || !isHourAlignedRange(start, end) ||
+          start >= windowEnd || end > windowEnd;
       });
 
       if (outsideWindow) {
         return response({
           ok: false,
-          message: 'Legacy bookings cannot start beyond the current booking window.',
+          message: 'Legacy bookings cannot extend beyond the current booking window.',
         });
       }
 
@@ -625,10 +634,10 @@ export async function applyReservationAction(
         });
       }
 
-      if (next.bookingWindowDays < 0) {
+      if (!Number.isInteger(next.bookingWindowDays) || next.bookingWindowDays < 1) {
         return response({
           ok: false,
-          message: 'Booking window must be 0 days or more.',
+          message: 'Bookable days must be a whole number of at least 1, including today.',
         });
       }
 
@@ -648,7 +657,7 @@ export async function applyReservationAction(
         createLogEntry(
           'settings_updated',
           'Admin',
-          `Booking window changed to ${settings.bookingWindowDays} days and maximum usage duration changed to ${settings.maxDurationDays} days`,
+          `Booking window changed to ${settings.bookingWindowDays} days including today and maximum usage duration changed to ${settings.maxDurationDays} days`,
         ),
       );
       return response({ ok: true, message: 'Booking rules have been saved.' });

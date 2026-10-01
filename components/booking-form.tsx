@@ -213,10 +213,10 @@ export function BookingForm({
 
       <div className="rule-summary section">
         <span>
-          Start booking window: today through {settings.bookingWindowDays} days later
+          Bookable days: {settings.bookingWindowDays}, including today (Korea time)
         </span>
         <span>
-          Maximum usage duration: {settings.maxDurationDays} days
+          Maximum usage duration: {settings.maxDurationDays} days, within the open booking window
         </span>
         <span>
           Reference end date:{' '}

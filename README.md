@@ -47,14 +47,17 @@ local JSON file, but that file can be lost on deploy, restart, and spin-down.
 
 ### Booking window
 
-The default start-date window is today through three days later, inclusive, using
-the calendar date in Asia/Seoul. For example, on October 1 all start times on
-October 1-4 are allowed; October 5 is not. The end time has a separate maximum
-duration measured from the selected start time.
+The default window is three calendar days **including today**, using Asia/Seoul
+time. On October 2, October 2-4 are open. The last bookable hour is October 4
+23:00 through October 5 00:00; neither starting nor continuing past that boundary
+is allowed. At October 3 00:00, October 5 opens and the end limit becomes October
+6 00:00. The maximum duration is also enforced, but never extends the open window.
 
-Existing installations keep the saved admin setting. Set **Booking window (days)**
+Existing installations keep the saved admin setting. Set **Bookable Days (including today)**
 to `3` in the admin page if the stored value is still `5`. Changing the code or
 rerunning `database/schema.sql` does not overwrite existing settings or bookings.
+Previously saved zero-day settings mean today only; new settings must be at least
+one day. Existing reservations are not cancelled or shortened by this rule change.
 
 Run `node scripts/verify-booking-window.cjs` to check creation, editing, recovery,
 and Korean midnight boundaries in multiple machine timezones without live data.

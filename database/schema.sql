@@ -65,7 +65,7 @@ create table if not exists pb_notices (
 
 create table if not exists pb_settings (
   id text primary key default 'default',
-  booking_window_days integer not null default 3 check (booking_window_days >= 0),
+  booking_window_days integer not null default 3 check (booking_window_days >= 1),
   max_duration_days integer not null default 5 check (max_duration_days > 0),
   updated_at timestamptz not null default now()
 );

@@ -20,6 +20,7 @@ import {
   getLatestBookableDate,
   addHours,
   getLatestAllowedEnd,
+  isStartWithinBookingWindow,
   toDateKey,
   type Booking,
   type Channel,
@@ -92,8 +93,12 @@ export default function Home() {
     };
 
     startMinuteTimer();
+    window.addEventListener('focus', syncNow);
+    document.addEventListener('visibilitychange', syncNow);
 
     return () => {
+      window.removeEventListener('focus', syncNow);
+      document.removeEventListener('visibilitychange', syncNow);
       if (timeoutId !== null) {
         window.clearTimeout(timeoutId);
       }
@@ -139,12 +144,15 @@ export default function Home() {
   }, [mounted, noticePopupDismissed, notices, now, ready]);
 
   const availableEndOptions = useMemo<EndOption[]>(() => {
-    if (!selectedSlot) {
+    if (!selectedSlot || !now) {
       return [];
     }
 
     const start = new Date(selectedSlot.startAt);
-    const latestEnd = getLatestAllowedEnd(start, settings);
+    if (!isStartWithinBookingWindow(start, settings, now)) {
+      return [];
+    }
+    const latestEnd = getLatestAllowedEnd(start, settings, now);
     const options: EndOption[] = [];
 
     for (
@@ -181,7 +189,7 @@ export default function Home() {
     }
 
     return options;
-  }, [blockedDates, bookings, language, selectedSlot, settings]);
+  }, [blockedDates, bookings, language, now, selectedSlot, settings]);
 
   useEffect(() => {
     if (!selectedSlot) {

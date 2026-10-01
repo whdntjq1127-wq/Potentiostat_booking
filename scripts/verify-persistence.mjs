@@ -45,7 +45,7 @@ function toDateTimeLocal(date) {
 
 function createTestRange() {
   const start = new Date();
-  start.setDate(start.getDate() + 3);
+  start.setDate(start.getDate() + 1);
   start.setHours(8, 0, 0, 0);
 
   const end = new Date(start);
