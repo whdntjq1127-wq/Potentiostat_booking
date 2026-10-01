@@ -22,6 +22,7 @@ import {
   type ReservationSnapshot,
 } from './reservation-data';
 import { getReservationStore } from './reservation-store';
+import { isBookingQueueEnabled } from './booking-queue';
 
 export type ActionResult = {
   ok: boolean;
@@ -292,7 +293,7 @@ async function response(
 
 export async function applyReservationAction(
   action: ReservationAction,
-  options: { isAdmin: boolean },
+  options: { isAdmin: boolean; queueSession?: string },
 ): Promise<ReservationActionResponse> {
   if (ADMIN_ACTIONS.has(action.type) && !options.isAdmin) {
     return response({
@@ -303,6 +304,19 @@ export async function applyReservationAction(
 
   const store = getReservationStore();
   const snapshot = await readReservationSnapshot();
+  const queued = isBookingQueueEnabled();
+  if (queued && action.type === 'recoverLegacySnapshot') {
+    return response({ ok: false, message: 'Legacy snapshot replacement is disabled while the booking queue is enabled.' });
+  }
+  if (queued && (action.type === 'addBookings' || action.type === 'updateBooking')) {
+    if (!options.queueSession || !store.bookingQueue || !store.commitQueued) {
+      return response({ ok: false, message: 'Press Book Now and wait for your booking turn.' });
+    }
+    const turn = await store.bookingQueue(options.queueSession, 'status');
+    if (turn.state !== 'active') {
+      return response({ ok: false, message: 'Please wait for your booking turn or join the queue again.' });
+    }
+  }
 
   switch (action.type) {
     case 'addBookings': {
@@ -381,7 +395,9 @@ export async function applyReservationAction(
           },
         ),
       );
-      const mutation = await store.insertBookings(bookings, logs);
+      const mutation = queued
+        ? await store.commitQueued!(options.queueSession!, 'create', bookings, logs)
+        : await store.insertBookings(bookings, logs);
 
       if (!mutation.ok) {
         return response({
@@ -458,7 +474,9 @@ export async function applyReservationAction(
           expiresAt: getBookingExpiryDate(endAt)?.toISOString(),
         },
       );
-      const mutation = await store.updateBooking(nextBooking, log);
+      const mutation = queued
+        ? await store.commitQueued!(options.queueSession!, 'update', [nextBooking], [log])
+        : await store.updateBooking(nextBooking, log);
 
       if (!mutation.ok) {
         return response({

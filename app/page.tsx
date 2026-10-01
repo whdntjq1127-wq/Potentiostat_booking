@@ -9,6 +9,8 @@ import {
 } from '../lib/i18n';
 import { useLanguage } from '../components/language-context';
 import { useReservation } from '../components/reservation-context';
+import { useBookingQueue } from '../components/use-booking-queue';
+import { BookingQueuePanel, QueueTimer, queueCopy } from '../components/booking-queue-panel';
 import { WeeklySchedule, type SelectedSlot } from '../components/weekly-schedule';
 import {
   CHANNELS,
@@ -34,6 +36,7 @@ type EndOption = {
 };
 
 const NOTICE_HIDE_DATE_KEY = 'potentiostat-booking-notice-hidden-date';
+const QUEUE_SELECTION_KEY = 'potentiostat-queue-selection-v1';
 
 export default function Home() {
   const {
@@ -44,8 +47,13 @@ export default function Home() {
     notices,
     settings,
     cancelBooking,
+    refresh,
   } = useReservation();
   const { copy, language } = useLanguage();
+  const queue = useBookingQueue();
+  const queueText = queueCopy[language];
+  const [bookingRequested, setBookingRequested] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [now, setNow] = useState<Date | null>(null);
   const [weekAnchor, setWeekAnchor] = useState<Date | null>(null);
@@ -67,6 +75,38 @@ export default function Home() {
   } | null>(null);
   const [showNoticePopup, setShowNoticePopup] = useState(false);
   const [noticePopupDismissed, setNoticePopupDismissed] = useState(false);
+
+  useEffect(() => {
+    try {
+      const saved = JSON.parse(sessionStorage.getItem(QUEUE_SELECTION_KEY) ?? 'null');
+      if (saved && CHANNELS.includes(saved.channel) && typeof saved.startAt === 'string' && typeof saved.endAt === 'string') {
+        setSelectedSlot(saved);
+        setBookingRequested(true);
+        setNoticePopupDismissed(true);
+      }
+    } catch { /* Storage is optional; the queue cookie remains server-owned. */ }
+  }, []);
+
+  useEffect(() => {
+    if (queue.status?.state === 'active') void refresh();
+  }, [queue.status?.state, refresh]);
+
+  async function startBooking() {
+    if (!selectedSlot || submitting || queue.busy) return;
+    setBookingRequested(true);
+    setShowNoticePopup(false);
+    try { sessionStorage.setItem(QUEUE_SELECTION_KEY, JSON.stringify(selectedSlot)); } catch { /* Optional. */ }
+    await queue.join();
+  }
+
+  async function closeBooking() {
+    if (submitting || queue.busy) return;
+    const result = await queue.leave();
+    if (!result) return;
+    setBookingRequested(false);
+    setSelectedSlot(null);
+    try { sessionStorage.removeItem(QUEUE_SELECTION_KEY); } catch { /* Optional. */ }
+  }
 
   useEffect(() => {
     let intervalId: number | null = null;
@@ -166,7 +206,7 @@ export default function Home() {
         break;
       }
 
-      const hasConflict = (selectedSlot.channels ?? [selectedSlot.channel]).some(
+      const hasConflict = selectedChannels.some(
         (channel) =>
           findActiveBookingConflict(
             bookings,
@@ -189,7 +229,7 @@ export default function Home() {
     }
 
     return options;
-  }, [blockedDates, bookings, language, now, selectedSlot, settings]);
+  }, [blockedDates, bookings, language, now, selectedSlot, selectedChannels, settings]);
 
   useEffect(() => {
     if (!selectedSlot) {
@@ -373,6 +413,15 @@ export default function Home() {
             </div>
           ) : null}
 
+          <div className="booking-entry-bar">
+            <span>{selectedSlot ? formatDateTimeLabelForLanguage(selectedSlot.startAt, language) : queueText.select}</span>
+            <button type="button" className="button" onClick={() => void startBooking()}
+              disabled={!selectedSlot || submitting || queue.busy || !queue.status}>
+              {!queue.status ? queueText.checking : queueText.book}
+            </button>
+          </div>
+          {queue.error && !bookingRequested ? <p role="alert" className="inline-message error">{queueText.error}</p> : null}
+
           <WeeklySchedule
             anchorDate={weekAnchor}
             now={now}
@@ -453,26 +502,34 @@ export default function Home() {
         </div>
       ) : null}
 
-      {selectedSlot ? (
-        <div className="modal-overlay" onClick={() => setSelectedSlot(null)}>
+      {bookingRequested && !submitting ? <BookingQueuePanel queue={queue} onClose={() => void closeBooking()} /> : null}
+
+      {selectedSlot && bookingRequested && (queue.canBook || submitting) ? (
+        <div className="modal-overlay" onClick={() => void closeBooking()}>
           <section
             className="modal-card"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="booking-form-title"
             onClick={(event) => event.stopPropagation()}
           >
             <div className="section-head">
               <div>
                 <div className="eyebrow">{copy.home.createEyebrow}</div>
-                <h2 className="section-title">{copy.home.createTitle}</h2>
+                <h2 className="section-title" id="booking-form-title">{copy.home.createTitle}</h2>
               </div>
               <button
                 type="button"
                 className="button-ghost"
-                onClick={() => setSelectedSlot(null)}
+                disabled={submitting || queue.busy}
+                onClick={() => void closeBooking()}
               >
                 {copy.home.close}
               </button>
             </div>
 
+            <QueueTimer queue={queue} />
+            {message && !message.ok ? <p role="alert" className="inline-message error">{message.text}</p> : null}
             <div className="selection-card modal-selection">
               <strong>{selectedChannelLabel}</strong>
               <span>
@@ -492,7 +549,8 @@ export default function Home() {
               className="form-grid section"
               onSubmit={async (event) => {
                 event.preventDefault();
-
+                if (submitting || !queue.canBook) return;
+                setSubmitting(true);
                 const result = await addBookings({
                   applicant,
                   channels: selectedChannels,
@@ -501,10 +559,13 @@ export default function Home() {
                   purpose,
                   password: bookingPassword,
                 });
-
+                setSubmitting(false);
                 setMessage({ ok: result.ok, text: result.message });
+                await queue.refresh();
 
                 if (result.ok) {
+                  setBookingRequested(false);
+                  try { sessionStorage.removeItem(QUEUE_SELECTION_KEY); } catch { /* Optional. */ }
                   setSelectedSlot(null);
                   setSelectedChannels([]);
                   setApplicant('');
@@ -522,20 +583,21 @@ export default function Home() {
                   value={applicant}
                   onChange={(event) => setApplicant(event.target.value)}
                   placeholder={copy.home.applicantPlaceholder}
+                  autoFocus
                   required
                 />
               </div>
 
               <div className="field full">
                 <label htmlFor="modal-password">
-                  Cancellation Password (optional)
+                  {queueText.password}
                 </label>
                 <input
                   id="modal-password"
                   type="password"
                   value={bookingPassword}
                   onChange={(event) => setBookingPassword(event.target.value)}
-                  placeholder="Leave blank to allow cancellation without a password."
+                  placeholder={queueText.passwordHint}
                 />
               </div>
 
@@ -555,6 +617,7 @@ export default function Home() {
                         className={`channel-toggle ${selected ? 'selected' : ''}`}
                         style={channelStyle}
                         disabled={!!conflict}
+                        aria-pressed={selected}
                         onClick={() => toggleChannel(channel)}
                         title={
                           conflict
@@ -644,13 +707,14 @@ export default function Home() {
               </div>
 
               <div className="action-row">
-                <button className="button" type="submit" disabled={!canSaveBooking}>
+                <button className="button" type="submit" disabled={!canSaveBooking || submitting || !queue.canBook}>
                   {copy.home.saveBooking}
                 </button>
                 <button
                   type="button"
                   className="button-ghost"
-                  onClick={() => setSelectedSlot(null)}
+                  disabled={submitting || queue.busy}
+                  onClick={() => void closeBooking()}
                 >
                   {copy.home.cancel}
                 </button>

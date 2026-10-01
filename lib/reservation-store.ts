@@ -1,6 +1,7 @@
 import { existsSync } from 'fs';
 import { mkdir, readFile, rename, writeFile } from 'fs/promises';
 import { dirname, join } from 'path';
+import type { QueueOperation, QueueStatus } from './booking-queue';
 import {
   DEFAULT_SETTINGS,
   compareBookings,
@@ -53,6 +54,8 @@ type SupabaseKeyKind =
   | 'unknown';
 
 export type ReservationStore = {
+  bookingQueue?: (session: string, operation: QueueOperation) => Promise<QueueStatus>;
+  commitQueued?: (session: string, mode: 'create' | 'update', bookings: Booking[], logs: ChangeLogEntry[]) => Promise<StoreMutationResult>;
   readSnapshot: () => Promise<ReservationSnapshot>;
   replaceSnapshot: (
     snapshot: ReservationSnapshot,
@@ -508,6 +511,19 @@ class FileReservationStore implements ReservationStore {
 }
 
 class SupabaseReservationStore implements ReservationStore {
+  async bookingQueue(session: string, operation: QueueOperation) {
+    return this.request<QueueStatus>('/rpc/pb_queue', {
+      method: 'POST', body: JSON.stringify({ p_session: session, p_operation: operation }),
+    });
+  }
+
+  async commitQueued(session: string, mode: 'create' | 'update', bookings: Booking[], logs: ChangeLogEntry[]) {
+    return this.request<StoreMutationResult>('/rpc/pb_queue_commit', {
+      method: 'POST', body: JSON.stringify({ p_session: session, p_mode: mode,
+        p_bookings: bookings.map(toBookingRow), p_logs: logs.map(toChangeLogRow) }),
+    });
+  }
+
   private readonly baseUrl: string;
   private readonly serviceKey: string;
   private readonly keyKind: SupabaseKeyKind;

@@ -552,6 +552,7 @@ export function WeeklySchedule({
                             }
                           }}
                           disabled={!selectable && !visibleBooking}
+                          aria-label={selectable ? `${formatShortDateLabelForLanguage(date, language)} ${group.label} ${channel}` : undefined}
                           title={
                             visibleBooking
                               ? copy.schedule.bookedByTitle(
@@ -560,7 +561,7 @@ export function WeeklySchedule({
                               : inBlockedDate
                                 ? copy.schedule.blockedDateTitle
                                 : inWindow
-                                  ? copy.schedule.notSelectableTitle
+                                  ? `${formatShortDateLabelForLanguage(date, language)} ${group.label} ${channel}`
                                   : copy.schedule.outsideWindowTitle
                           }
                         >

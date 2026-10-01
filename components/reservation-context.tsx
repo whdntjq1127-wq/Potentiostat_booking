@@ -213,7 +213,7 @@ export function ReservationProvider({ children }: { children: ReactNode }) {
     }
 
     const marker = window.localStorage.getItem(LEGACY_RECOVERY_MARKER);
-    if (marker === 'done' || marker === 'running') {
+    if (marker === 'done' || marker === 'running' || marker === 'queue-disabled') {
       return;
     }
 
@@ -241,6 +241,11 @@ export function ReservationProvider({ children }: { children: ReactNode }) {
 
       if (result.ok) {
         window.localStorage.setItem(LEGACY_RECOVERY_MARKER, 'done');
+        return;
+      }
+
+      if (result.message === 'Legacy snapshot replacement is disabled while the booking queue is enabled.') {
+        window.localStorage.setItem(LEGACY_RECOVERY_MARKER, 'queue-disabled');
         return;
       }
 

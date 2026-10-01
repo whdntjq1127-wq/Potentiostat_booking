@@ -3,6 +3,9 @@
 import type { CSSProperties } from 'react';
 import { useEffect, useMemo, useState } from 'react';
 import { useReservation } from '../../components/reservation-context';
+import { useLanguage } from '../../components/language-context';
+import { useBookingQueue } from '../../components/use-booking-queue';
+import { BookingQueuePanel, QueueTimer, queueCopy } from '../../components/booking-queue-panel';
 import {
   CHANNELS,
   addHours,
@@ -25,6 +28,11 @@ type EditDraft = {
 };
 
 export default function MyBookingsPage() {
+  const queue = useBookingQueue();
+  const { language } = useLanguage();
+  const queueText = queueCopy[language];
+  const [queueRequested, setQueueRequested] = useState(false);
+  const [saving, setSaving] = useState(false);
   const { bookings, cancelBooking, ready, settings, updateBooking } = useReservation();
   const [now, setNow] = useState(() => new Date());
   const [query, setQuery] = useState('');
@@ -96,8 +104,16 @@ export default function MyBookingsPage() {
     setEditMessage(null);
   }
 
+  async function closeEdit() {
+    if (saving || queue.busy) return;
+    if (queueRequested && !(await queue.leave())) return;
+    setQueueRequested(false);
+    setEditingId(null);
+  }
+
   return (
     <main className="lookup-layout">
+      {queueRequested ? <BookingQueuePanel queue={queue} onClose={() => void closeEdit()} /> : null}
       <section className="panel">
         <div className="eyebrow">Find My Bookings</div>
         <h1 className="section-title">Search Bookings by Name</h1>
@@ -164,7 +180,7 @@ export default function MyBookingsPage() {
                       className="button-ghost"
                       onClick={() =>
                         editingId === booking.id
-                          ? setEditingId(null)
+                          ? void closeEdit()
                           : beginEdit(booking)
                       }
                     >
@@ -218,6 +234,13 @@ export default function MyBookingsPage() {
                     className="form-grid section edit-form"
                     onSubmit={async (event) => {
                       event.preventDefault();
+                      if (saving) return;
+                      if (!queue.canBook) {
+                        setQueueRequested(true);
+                        await queue.join();
+                        return;
+                      }
+                      setSaving(true);
                       const result = await updateBooking({
                         id: booking.id,
                         requestedBy: query.trim() || booking.applicant,
@@ -226,34 +249,29 @@ export default function MyBookingsPage() {
                         endAt: editDraft.endAt,
                         purpose: editDraft.purpose,
                       });
+                      setSaving(false);
+                      await queue.refresh();
                       setEditMessage(result.message);
                       if (result.ok) {
+                        setQueueRequested(false);
                         setEditingId(null);
                       }
                     }}
                   >
+                    {queue.status?.state === 'active' ? <div className="full"><QueueTimer queue={queue} /></div> : null}
                     <div className="field">
                       <label htmlFor={`channel-${booking.id}`}>Channel</label>
-                      <select
-                        id={`channel-${booking.id}`}
-                        value={editDraft.channel}
-                        onChange={(event) =>
-                          setEditDraft((current) =>
-                            current
-                              ? {
-                                  ...current,
-                                  channel: event.target.value as Channel,
-                                }
-                              : current,
-                          )
-                        }
-                      >
+                      <div className="channel-picker" role="group" aria-label="Channel">
                         {CHANNELS.map((channel) => (
-                          <option key={channel} value={channel}>
+                          <button type="button" key={channel}
+                            className={`channel-toggle ${editDraft.channel === channel ? 'selected' : ''}`}
+                            aria-pressed={editDraft.channel === channel}
+                            style={{ '--channel-color': getChannelColor(channel) } as CSSProperties}
+                            onClick={() => setEditDraft((current) => current ? { ...current, channel } : current)}>
                             {channel}
-                          </option>
+                          </button>
                         ))}
-                      </select>
+                      </div>
                     </div>
 
                     <div className="field">
@@ -325,13 +343,14 @@ export default function MyBookingsPage() {
                     </div>
 
                     <div className="action-row">
-                      <button className="button" type="submit">
-                        Save Changes
+                      <button className="button" type="submit" disabled={saving || queue.busy || !queue.status}>
+                        {queue.canBook ? (language === 'ko' ? '변경 저장' : 'Save Changes') : queueText.book}
                       </button>
                       <button
                         type="button"
                         className="button-ghost"
-                        onClick={() => setEditingId(null)}
+                        disabled={saving || queue.busy}
+                        onClick={() => void closeEdit()}
                       >
                         Close
                       </button>
