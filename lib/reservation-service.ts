@@ -11,8 +11,11 @@ import {
   getBlockedDateInRange,
   getBookingExpiryDate,
   getLatestAllowedEnd,
+  getLatestBookableDate,
   isStartWithinBookingWindow,
   pruneExpiredReservationState,
+  startOfDay,
+  toDateTimeLocal,
   type Booking,
   type Channel,
   type ChangeLogEntry,
@@ -211,13 +214,22 @@ export async function readReservationSnapshot() {
   );
 }
 
+function parseBookingDateTime(value: string) {
+  if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(value)) {
+    return null;
+  }
+
+  const parsed = fromDateTimeLocal(value);
+  return parsed && toDateTimeLocal(parsed) === value ? parsed : null;
+}
+
 function validateTimeRange(
   snapshot: ReservationSnapshot,
   startAt: string,
   endAt: string,
 ) {
-  const start = fromDateTimeLocal(startAt);
-  const end = fromDateTimeLocal(endAt);
+  const start = parseBookingDateTime(startAt);
+  const end = parseBookingDateTime(endAt);
 
   if (!start || !end) {
     return { ok: false as const, message: 'Enter a valid start and end time.' };
@@ -501,9 +513,28 @@ export async function applyReservationAction(
     }
 
     case 'recoverLegacySnapshot': {
+      const legacy = normalizeLegacySnapshot(action.payload.snapshot);
+      const currentIds = new Set(snapshot.bookings.map((booking) => booking.id));
+      const latestStartDate = getLatestBookableDate(snapshot.settings);
+      const outsideWindow = legacy.bookings.some((booking) => {
+        if (currentIds.has(booking.id)) {
+          return false;
+        }
+
+        const start = parseBookingDateTime(booking.startAt);
+        return !start || startOfDay(start) > latestStartDate;
+      });
+
+      if (outsideWindow) {
+        return response({
+          ok: false,
+          message: 'Legacy bookings cannot start beyond the current booking window.',
+        });
+      }
+
       const recoveredSnapshot = mergeLegacySnapshot(
         snapshot,
-        action.payload.snapshot,
+        legacy,
       );
       const recoveredCount =
         recoveredSnapshot.bookings.length - snapshot.bookings.length;

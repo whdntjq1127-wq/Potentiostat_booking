@@ -65,13 +65,13 @@ create table if not exists pb_notices (
 
 create table if not exists pb_settings (
   id text primary key default 'default',
-  booking_window_days integer not null default 5 check (booking_window_days >= 0),
+  booking_window_days integer not null default 3 check (booking_window_days >= 0),
   max_duration_days integer not null default 5 check (max_duration_days > 0),
   updated_at timestamptz not null default now()
 );
 
 insert into pb_settings (id, booking_window_days, max_duration_days)
-values ('default', 5, 5)
+values ('default', 3, 5)
 on conflict (id) do nothing;
 
 grant usage on schema public to service_role;

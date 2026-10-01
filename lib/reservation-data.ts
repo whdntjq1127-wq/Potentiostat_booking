@@ -56,9 +56,23 @@ export type ReservationSnapshot = {
 };
 
 export const DEFAULT_SETTINGS: ReservationSettings = {
-  bookingWindowDays: 5,
+  bookingWindowDays: 3,
   maxDurationDays: 5,
 };
+
+const BOOKING_DATE_FORMAT = new Intl.DateTimeFormat('en-CA', {
+  timeZone: 'Asia/Seoul',
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+});
+
+function getBookingToday(now: Date) {
+  const parts = BOOKING_DATE_FORMAT.formatToParts(now);
+  const part = (type: string) => parts.find((item) => item.type === type)!.value;
+  // Booking values have no offset: use Korean today's date as a local wall-clock date.
+  return new Date(`${part('year')}-${part('month')}-${part('day')}T00:00`);
+}
 
 const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] as const;
 const MONTH_NAMES = [
@@ -272,7 +286,7 @@ export function isStartWithinBookingWindow(
   settings: ReservationSettings,
   now = new Date(),
 ) {
-  const first = startOfDay(now);
+  const first = getBookingToday(now);
   const latest = addDays(first, settings.bookingWindowDays);
   const startDate = startOfDay(start);
 
@@ -283,7 +297,7 @@ export function getLatestBookableDate(
   settings: ReservationSettings,
   now = new Date(),
 ) {
-  return addDays(startOfDay(now), settings.bookingWindowDays);
+  return addDays(getBookingToday(now), settings.bookingWindowDays);
 }
 
 export function getLatestAllowedEnd(

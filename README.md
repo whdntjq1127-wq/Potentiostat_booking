@@ -45,6 +45,20 @@ Important: Render persistent disks require a paid web service plan. Free Render
 web services have an ephemeral filesystem. The app will still work by writing a
 local JSON file, but that file can be lost on deploy, restart, and spin-down.
 
+### Booking window
+
+The default start-date window is today through three days later, inclusive, using
+the calendar date in Asia/Seoul. For example, on October 1 all start times on
+October 1-4 are allowed; October 5 is not. The end time has a separate maximum
+duration measured from the selected start time.
+
+Existing installations keep the saved admin setting. Set **Booking window (days)**
+to `3` in the admin page if the stored value is still `5`. Changing the code or
+rerunning `database/schema.sql` does not overwrite existing settings or bookings.
+
+Run `node scripts/verify-booking-window.cjs` to check creation, editing, recovery,
+and Korean midnight boundaries in multiple machine timezones without live data.
+
 ### Verify persistence locally
 
 Run this command before deploying storage changes:
