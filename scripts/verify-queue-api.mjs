@@ -80,6 +80,10 @@ try {
     await sleep(200);
   }
   assert.ok(ready, logs);
+  const initialHtml = await (await fetch(base)).text();
+  assert.match(initialHtml, /<button[^>]*class="booking-start-button"[^>]*>.*?Book Now/s,
+    'The initial page must offer Book Now before choosing a calendar slot');
+  assert.doesNotMatch(initialHtml, /<table[\s>]/, 'The calendar stays hidden until admission');
   if (process.argv.includes('--serve')) {
     await db.query('select pb_queue($1, $2)', ['f'.repeat(64), 'join']);
     console.log(`UI_URL=${base}\nTEST_REST_URL=${restUrl}`);

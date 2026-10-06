@@ -6,18 +6,20 @@ The queue is implemented in this repository but is OFF until explicitly enabled.
 
 1. In the existing Supabase project, open SQL Editor, create a new query, and run all of `database/booking-queue.sql`. The existing `database/schema.sql` must already be installed. Do not replace the project or delete existing tables.
 2. In the Render web service, open Environment and add `RESERVATION_QUEUE_ENABLED` with value `true`. Keep the existing `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` unchanged. Save and deploy.
-3. After deployment finishes, use two separate browsers (or a normal and private window). Select a calendar block and press Book Now in each. The first browser should show the form and a 02:00 countdown; the second should show position 02. Cancel the first turn and verify the second is admitted automatically.
+3. After deployment finishes, use two separate browsers (or a normal and private window). Press Book Now on the entry screen in each, without selecting any slot first. The first browser should show the calendar and a 02:00 countdown; the second should show position 02. Choose Exit Booking in the first browser and verify the second calendar opens automatically.
 4. Confirm both English and Korean using the site's language control. Confirm one small test booking appears in the calendar/logbook, then cancel it normally.
 
 If setup has not been completed, no fake waiting order is displayed. If enabled but SQL/credentials are missing or the database is unavailable, the queue refuses new bookings rather than bypassing admission. Set the flag to `false` and redeploy only if intentionally reverting to the old, no-queue booking behavior. Do not delete queue tables to disable it.
 
 ## Operating behavior
 
-- Calendar viewing and cancellations remain open to everyone.
+- The home page initially shows a prominent Book Now button. The calendar appears after admission (or immediately after pressing the button if queue mode is disabled). My Bookings remains accessible from navigation without joining the queue, including cancellations.
+- Clicking a calendar block or dragging a range opens the booking form directly. A name and final Save are still required; dragging never silently saves a reservation. Closing this form returns to the calendar without losing the current turn. Exit Booking releases the turn and returns to the entry screen.
+- Notices remain visible in the calendar header rather than an automatic entry popup.
 - New bookings and reservation edits require a turn. The first valid request serialized by the database gets the earlier ticket; client clocks do not decide order.
-- One browser session is admitted at a time, for two minutes. Multiple selected channels are committed together in one transaction with the public logbook, and the turn is consumed once.
+- One browser session is admitted at a time, for two minutes starting when the calendar is admitted, including time spent selecting blocks. Multiple selected channels are committed together in one transaction with the public logbook, and the turn is consumed once. Successful submission returns to the entry screen with a confirmation.
 - Waiting browsers poll every two seconds. Next admission is normally observed on the next poll, not instantaneously. Background browser throttling and network delays can add latency.
-- Refresh keeps the HttpOnly browser session cookie and queue position. The main calendar also restores the selected slot from session storage, but does not store the name/password there. Refresh does not extend the two-minute lease.
+- Refresh keeps the HttpOnly browser session cookie and queue position, even before any slot is selected. The entry marker and selected slot are restored from session storage, but the name/password are not stored there. Refresh does not extend the two-minute lease. Retrying after expiry opens the calendar for a fresh selection.
 - Waiting sessions expire after five minutes without a heartbeat. Active sessions expire after two minutes even if a tab closes. Old terminal tickets are cleaned up during queue traffic after one day.
 - A turn is not a hold on a channel/time slot. Availability is rechecked when saving. Conflicts leave the turn open for another attempt within its remaining time.
 - Browser legacy-snapshot recovery is disabled in queue mode because it replaces the whole snapshot outside the queue transaction. Existing stored records remain unchanged. Historical recovery needs a separately reviewed administrator procedure.

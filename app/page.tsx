@@ -35,8 +35,8 @@ type EndOption = {
   timeLabel: string;
 };
 
-const NOTICE_HIDE_DATE_KEY = 'potentiostat-booking-notice-hidden-date';
 const QUEUE_SELECTION_KEY = 'potentiostat-queue-selection-v1';
+const QUEUE_ENTRY_KEY = 'potentiostat-queue-entry-v1';
 
 export default function Home() {
   const {
@@ -73,39 +73,61 @@ export default function Home() {
     ok: boolean;
     text: string;
   } | null>(null);
-  const [showNoticePopup, setShowNoticePopup] = useState(false);
-  const [noticePopupDismissed, setNoticePopupDismissed] = useState(false);
-
   useEffect(() => {
     try {
+      if (sessionStorage.getItem(QUEUE_ENTRY_KEY) === 'entered') setBookingRequested(true);
       const saved = JSON.parse(sessionStorage.getItem(QUEUE_SELECTION_KEY) ?? 'null');
-      if (saved && CHANNELS.includes(saved.channel) && typeof saved.startAt === 'string' && typeof saved.endAt === 'string') {
+      if (saved && CHANNELS.includes(saved.channel) && typeof saved.startAt === 'string' && typeof saved.endAt === 'string'
+        && (!saved.channels || (Array.isArray(saved.channels) && saved.channels.every((channel: Channel) => CHANNELS.includes(channel))))) {
         setSelectedSlot(saved);
+        setEndAt(saved.endAt);
         setBookingRequested(true);
-        setNoticePopupDismissed(true);
       }
     } catch { /* Storage is optional; the queue cookie remains server-owned. */ }
   }, []);
 
   useEffect(() => {
     if (queue.status?.state === 'active') void refresh();
+    if (queue.status?.state === 'expired' || queue.status?.state === 'cancelled') {
+      setSelectedSlot(null);
+      setEndAt('');
+      try { sessionStorage.removeItem(QUEUE_SELECTION_KEY); } catch { /* Optional. */ }
+    }
   }, [queue.status?.state, refresh]);
 
   async function startBooking() {
-    if (!selectedSlot || submitting || queue.busy) return;
+    if (submitting || queue.busy || !ready) return;
     setBookingRequested(true);
-    setShowNoticePopup(false);
-    try { sessionStorage.setItem(QUEUE_SELECTION_KEY, JSON.stringify(selectedSlot)); } catch { /* Optional. */ }
+    setSelectedSlot(null);
+    setEndAt('');
+    setMessage(null);
+    try {
+      sessionStorage.setItem(QUEUE_ENTRY_KEY, 'entered');
+      sessionStorage.removeItem(QUEUE_SELECTION_KEY);
+    } catch { /* Optional. */ }
     await queue.join();
   }
 
-  async function closeBooking() {
+  function dismissBookingForm() {
+    if (submitting) return;
+    setSelectedSlot(null);
+    setEndAt('');
+    setMessage(null);
+    try { sessionStorage.removeItem(QUEUE_SELECTION_KEY); } catch { /* Optional. */ }
+  }
+
+  async function exitBooking() {
     if (submitting || queue.busy) return;
     const result = await queue.leave();
     if (!result) return;
     setBookingRequested(false);
     setSelectedSlot(null);
-    try { sessionStorage.removeItem(QUEUE_SELECTION_KEY); } catch { /* Optional. */ }
+    setEndAt('');
+    setCancellingBookings([]);
+    try {
+      sessionStorage.removeItem(QUEUE_ENTRY_KEY);
+      sessionStorage.removeItem(QUEUE_SELECTION_KEY);
+    } catch { /* Optional. */ }
   }
 
   useEffect(() => {
@@ -160,28 +182,6 @@ export default function Home() {
     setPurpose('');
     setBookingPassword('');
   }, [selectedSlot]);
-
-  useEffect(() => {
-    if (!ready || !mounted || !now || notices.length === 0) {
-      setShowNoticePopup(false);
-      return;
-    }
-
-    if (noticePopupDismissed) {
-      setShowNoticePopup(false);
-      return;
-    }
-
-    let hiddenDate: string | null = null;
-
-    try {
-      hiddenDate = window.localStorage.getItem(NOTICE_HIDE_DATE_KEY);
-    } catch {
-      hiddenDate = null;
-    }
-
-    setShowNoticePopup(hiddenDate !== toDateKey(now));
-  }, [mounted, noticePopupDismissed, notices, now, ready]);
 
   const availableEndOptions = useMemo<EndOption[]>(() => {
     if (!selectedSlot || !now) {
@@ -309,13 +309,20 @@ export default function Home() {
     );
   }, [channelAvailability, selectedSlot]);
 
-  if (!ready || !mounted || !now || !weekAnchor) {
+  if (!ready || !mounted || !now || !weekAnchor || !bookingRequested || (!queue.canBook && !submitting)) {
     return (
-      <main>
-        <section className="panel">
-          <div className="eyebrow">{copy.home.loadingEyebrow}</div>
-          <h1 className="section-title">{copy.home.loadingTitle}</h1>
+      <main className="booking-entry-page">
+        <section className="booking-start" aria-label={queueText.book}>
+          <button type="button" className="booking-start-button" onClick={() => void startBooking()}
+            disabled={!ready || !mounted || !queue.status || submitting || queue.busy}
+            aria-busy={!queue.status || queue.busy}>
+            <span>{queueText.book}</span>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14m-6-6 6 6-6 6" /></svg>
+          </button>
+          {message ? <p role="status" className={`inline-message ${message.ok ? 'success' : 'error'}`}>{message.text}</p> : null}
+          {queue.error && !bookingRequested ? <p role="alert" className="inline-message error">{queueText.error}</p> : null}
         </section>
+        {bookingRequested && !submitting ? <BookingQueuePanel queue={queue} onClose={() => void exitBooking()} /> : null}
       </main>
     );
   }
@@ -339,19 +346,6 @@ export default function Home() {
     setCancellingBookings(booking ? [booking] : []);
   };
   const canSaveBooking = selectedChannels.length > 0 && !!endAt;
-  const closeNoticePopup = () => {
-    setNoticePopupDismissed(true);
-    setShowNoticePopup(false);
-  };
-  const hideNoticeForToday = () => {
-    try {
-      window.localStorage.setItem(NOTICE_HIDE_DATE_KEY, toDateKey(now));
-    } catch {
-      // If localStorage is unavailable, fall back to dismissing for this page.
-    }
-
-    closeNoticePopup();
-  };
   const toggleChannel = (channel: Channel) => {
     const availability = channelAvailability.find(
       (item) => item.channel === channel,
@@ -413,22 +407,25 @@ export default function Home() {
             </div>
           ) : null}
 
-          <div className="booking-entry-bar">
-            <span>{selectedSlot ? formatDateTimeLabelForLanguage(selectedSlot.startAt, language) : queueText.select}</span>
-            <button type="button" className="button" onClick={() => void startBooking()}
-              disabled={!selectedSlot || submitting || queue.busy || !queue.status}>
-              {!queue.status ? queueText.checking : queueText.book}
+          <div className="booking-session-bar">
+            <span>{queueText.select}</span>
+            <QueueTimer queue={queue} />
+            <button type="button" className="button-ghost" onClick={() => void exitBooking()}
+              disabled={submitting || queue.busy}>
+              {queueText.exit}
             </button>
           </div>
-          {queue.error && !bookingRequested ? <p role="alert" className="inline-message error">{queueText.error}</p> : null}
 
           <WeeklySchedule
             anchorDate={weekAnchor}
             now={now}
             selectedSlot={selectedSlot}
             onSelectSlot={(slot) => {
+              if (!queue.canBook || submitting) return;
               setSelectedSlot(slot);
+              setEndAt(slot.endAt);
               setMessage(null);
+              try { sessionStorage.setItem(QUEUE_SELECTION_KEY, JSON.stringify(slot)); } catch { /* Optional. */ }
             }}
             onCancelBooking={(booking) => {
               setCancellingBookings([booking]);
@@ -450,68 +447,15 @@ export default function Home() {
           />
       </section>
 
-      {showNoticePopup ? (
-        <div className="modal-overlay" onClick={closeNoticePopup}>
-          <section
-            className="modal-card notice-popup-card"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="notice-popup-title"
-            onClick={(event) => event.stopPropagation()}
-          >
-            <div className="section-head">
-              <div>
-                <div className="eyebrow">공지사항</div>
-                <h2 className="section-title" id="notice-popup-title">
-                  예약 전 확인해주세요
-                </h2>
-                <p className="muted">
-                  관리자가 등록한 최신 공지사항입니다.
-                </p>
-              </div>
-            </div>
-
-            <div className="notice-popup-list section">
-              {notices.map((notice, index) => (
-                <div
-                  key={`${index}-${notice}`}
-                  className="announcement notice-popup-item"
-                >
-                  {notice}
-                </div>
-              ))}
-            </div>
-
-            <div className="action-row notice-popup-actions">
-              <button
-                type="button"
-                className="button-ghost"
-                onClick={closeNoticePopup}
-              >
-                닫기
-              </button>
-              <button
-                type="button"
-                className="button"
-                onClick={hideNoticeForToday}
-              >
-                오늘 하루동안 보지않기
-              </button>
-            </div>
-          </section>
-        </div>
-      ) : null}
-
-      {bookingRequested && !submitting ? <BookingQueuePanel queue={queue} onClose={() => void closeBooking()} /> : null}
-
       {selectedSlot && bookingRequested && (queue.canBook || submitting) ? (
-        <div className="modal-overlay" onClick={() => void closeBooking()}>
+        <div className="modal-overlay" onClick={dismissBookingForm}>
           <section
             className="modal-card"
             role="dialog"
             aria-modal="true"
             aria-labelledby="booking-form-title"
             onClick={(event) => event.stopPropagation()}
+            onKeyDown={(event) => { if (event.key === 'Escape') dismissBookingForm(); }}
           >
             <div className="section-head">
               <div>
@@ -522,7 +466,7 @@ export default function Home() {
                 type="button"
                 className="button-ghost"
                 disabled={submitting || queue.busy}
-                onClick={() => void closeBooking()}
+                onClick={dismissBookingForm}
               >
                 {copy.home.close}
               </button>
@@ -565,7 +509,10 @@ export default function Home() {
 
                 if (result.ok) {
                   setBookingRequested(false);
-                  try { sessionStorage.removeItem(QUEUE_SELECTION_KEY); } catch { /* Optional. */ }
+                  try {
+                    sessionStorage.removeItem(QUEUE_ENTRY_KEY);
+                    sessionStorage.removeItem(QUEUE_SELECTION_KEY);
+                  } catch { /* Optional. */ }
                   setSelectedSlot(null);
                   setSelectedChannels([]);
                   setApplicant('');
@@ -714,7 +661,7 @@ export default function Home() {
                   type="button"
                   className="button-ghost"
                   disabled={submitting || queue.busy}
-                  onClick={() => void closeBooking()}
+                  onClick={dismissBookingForm}
                 >
                   {copy.home.cancel}
                 </button>

@@ -6,9 +6,9 @@ import type { BookingQueue } from './use-booking-queue';
 
 export const queueCopy = {
   en: {
-    book: 'Book Now', select: 'Select a calendar block or drag a range, then press Book Now.',
+    book: 'Book Now', select: 'Click a block or drag a range to open the booking form.', exit: 'Exit Booking',
     waiting: 'Waiting for your booking turn', position: 'Your position', ahead: 'People ahead',
-    help: 'The booking form opens automatically when it is your turn. Keep this page open.',
+    help: 'You will be admitted automatically when it is your turn. Keep this page open.',
     note: 'One person at a time. You have 2 minutes to submit. A turn does not hold a channel or time slot.',
     leave: 'Leave queue', retry: 'Join again', expired: 'Your booking turn has expired',
     expiredHelp: 'Please join the queue again. Your booking has not been submitted.',
@@ -20,9 +20,9 @@ export const queueCopy = {
     passwordHint: 'Leave blank to allow cancellation without a password.',
   },
   ko: {
-    book: '예약하기', select: '달력에서 블록을 선택하거나 드래그한 후 예약하기를 눌러주세요.',
+    book: '예약하기', select: '달력 블록을 클릭하거나 드래그하면 예약 입력 창이 바로 열립니다.', exit: '예약 나가기',
     waiting: '예약 순서를 기다리고 있습니다', position: '내 대기 순번', ahead: '앞에 대기 중',
-    help: '내 차례가 되면 예약 입력 창이 자동으로 열립니다. 이 페이지를 열어두세요.',
+    help: '내 차례가 되면 자동으로 입장합니다. 이 페이지를 열어두세요.',
     note: '한 번에 한 명씩, 2분 동안 예약할 수 있습니다. 입장만으로 채널이나 시간이 확보되지는 않습니다.',
     leave: '대기 취소', retry: '다시 줄 서기', expired: '예약 입력 시간이 만료되었습니다',
     expiredHelp: '다시 대기열에 참여해주세요. 예약은 등록되지 않았습니다.',

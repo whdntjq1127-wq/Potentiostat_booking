@@ -8,6 +8,7 @@ import { useLanguage } from './language-context';
 
 const navItems = [
   { href: '/', labelKey: 'weekly' },
+  { href: '/my-bookings', labelKey: 'myBookings' },
   { href: '/admin', labelKey: 'admin' },
 ] as const;
 
