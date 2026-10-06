@@ -5,11 +5,11 @@ import { btree_gist } from '@electric-sql/pglite/contrib/btree_gist';
 
 const migration = new URL('../database/booking-queue.sql', import.meta.url);
 assert.ok(existsSync(migration), 'Durable queue migration must exist');
-export async function createQueueDatabase() {
+export async function createQueueDatabase(queueSql = readFileSync(migration, 'utf8')) {
   const db = new PGlite({ extensions: { btree_gist } });
   await db.exec('create role service_role; create role anon; create role authenticated;');
   await db.exec(readFileSync(new URL('../database/schema.sql', import.meta.url), 'utf8'));
-  await db.exec(readFileSync(migration, 'utf8'));
+  await db.exec(queueSql);
   return db;
 }
 
@@ -25,12 +25,15 @@ async function run() {
     [token, mode, JSON.stringify(bookings), JSON.stringify(logs)],
   )).rows[0].result;
   try {
+    // Keep two slots occupied while exercising the existing one-vacancy regressions.
+    assert.equal((await queue('e'.repeat(64), 'join')).state, 'active');
+    assert.equal((await queue('f'.repeat(64), 'join')).state, 'active');
     assert.equal((await queue(a, 'join')).state, 'active');
     const expiry = (await queue(a)).expiresAt;
     assert.equal((await queue(a, 'join')).expiresAt, expiry, 'Duplicate join must not extend lease');
-    assert.equal((await queue(b, 'join')).position, 2);
-    assert.equal((await queue(c, 'join')).position, 3);
-    assert.equal((await queue(b, 'join')).position, 2);
+    assert.equal((await queue(b, 'join')).position, 1);
+    assert.equal((await queue(c, 'join')).position, 2);
+    assert.equal((await queue(b, 'join')).position, 1);
     assert.equal((await queue(d)).state, 'idle', 'Polling must not join');
     assert.equal((await commit(b, 'create', [], [])).ok, false, 'Waiters cannot write');
     await queue(a, 'leave');

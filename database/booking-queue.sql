@@ -1,6 +1,7 @@
 -- Run after schema.sql, then set RESERVATION_QUEUE_ENABLED=true on Render.
--- Additive migration: existing reservations and settings are not replaced.
+-- Rerunnable three-person upgrade: existing reservations and settings are not replaced.
 begin;
+select pg_advisory_xact_lock(910042);
 
 create table if not exists public.pb_booking_queue (
   ticket bigint generated always as identity primary key,
@@ -10,8 +11,22 @@ create table if not exists public.pb_booking_queue (
   heartbeat_at timestamptz not null default clock_timestamp(),
   expires_at timestamptz
 );
-create unique index if not exists pb_queue_one_active
-  on public.pb_booking_queue ((true)) where state = 'active';
+alter table public.pb_booking_queue add column if not exists active_slot smallint;
+-- The previous schema allowed only one active ticket; preserve its deadline.
+update public.pb_booking_queue set active_slot = 1 where state = 'active' and active_slot is null;
+do $$
+begin
+  if not exists (select 1 from pg_constraint
+    where conrelid = 'public.pb_booking_queue'::regclass and conname = 'pb_queue_slot_state') then
+    alter table public.pb_booking_queue add constraint pb_queue_slot_state check (
+      (state = 'active' and active_slot is not null and active_slot between 1 and 3)
+      or (state <> 'active' and active_slot is null)
+    );
+  end if;
+end $$;
+create unique index if not exists pb_queue_active_slot
+  on public.pb_booking_queue (active_slot) where state = 'active';
+drop index if exists public.pb_queue_one_active;
 create index if not exists pb_queue_waiting_order
   on public.pb_booking_queue (ticket) where state = 'waiting';
 alter table public.pb_booking_queue enable row level security;
@@ -24,6 +39,7 @@ declare
   v_now timestamptz;
   v_self public.pb_booking_queue%rowtype;
   v_position integer := 0;
+  v_slot integer;
 begin
   if p_session is null or p_session !~ '^[a-f0-9]{64}$'
     or p_operation not in ('status', 'join', 'leave') or p_operation is null then
@@ -32,7 +48,7 @@ begin
   -- All admission and booking writes share this transaction-scoped lock.
   perform pg_advisory_xact_lock(910042);
   v_now := clock_timestamp();
-  update public.pb_booking_queue set state = 'expired'
+  update public.pb_booking_queue set state = 'expired', active_slot = null
     where (state = 'active' and expires_at <= v_now)
        or (state = 'waiting' and heartbeat_at <= v_now - interval '5 minutes');
   delete from public.pb_booking_queue
@@ -44,22 +60,27 @@ begin
     insert into public.pb_booking_queue (session_hash, state, heartbeat_at)
       values (p_session, 'waiting', v_now) on conflict (session_hash) do nothing;
   elsif p_operation = 'leave' then
-    update public.pb_booking_queue set state = 'cancelled', heartbeat_at = v_now
+    update public.pb_booking_queue set state = 'cancelled', active_slot = null, heartbeat_at = v_now
       where session_hash = p_session and state in ('waiting', 'active');
   end if;
   update public.pb_booking_queue set heartbeat_at = v_now
     where session_hash = p_session and state in ('waiting', 'active');
 
-  if not exists (select 1 from public.pb_booking_queue where state = 'active') then
-    update public.pb_booking_queue set state = 'active', expires_at = v_now + interval '2 minutes'
+  -- Fill every vacancy in FIFO order without extending existing active leases.
+  for v_slot in select candidate from generate_series(1, 3) as slots(candidate)
+    where not exists (select 1 from public.pb_booking_queue where state = 'active' and active_slot = candidate)
+    order by candidate
+  loop
+    update public.pb_booking_queue set state = 'active', active_slot = v_slot, expires_at = v_now + interval '2 minutes'
       where ticket = (select ticket from public.pb_booking_queue where state = 'waiting' order by ticket limit 1);
-  end if;
+    exit when not found;
+  end loop;
   select * into v_self from public.pb_booking_queue where session_hash = p_session;
   if v_self.state = 'active' then
     v_position := 1;
   elsif v_self.state = 'waiting' then
     select count(*)::integer + 1 into v_position from public.pb_booking_queue
-      where state = 'active' or (state = 'waiting' and ticket < v_self.ticket);
+      where state = 'waiting' and ticket < v_self.ticket;
   end if;
   return jsonb_build_object('enabled', true, 'state', coalesce(v_self.state, 'idle'),
     'position', v_position, 'ahead', greatest(v_position - 1, 0),
@@ -135,7 +156,7 @@ begin
     insert into public.pb_change_logs (id, actor, action, summary, created_at, booking_id, expires_at)
       select id, actor, action, summary, created_at, booking_id, expires_at
       from jsonb_populate_recordset(null::public.pb_change_logs, p_logs);
-    update public.pb_booking_queue set state = 'complete', heartbeat_at = v_now where session_hash = p_session;
+    update public.pb_booking_queue set state = 'complete', active_slot = null, heartbeat_at = v_now where session_hash = p_session;
   exception when exclusion_violation then
     return jsonb_build_object('ok', false, 'message', 'A selected channel was just booked. Please choose another time.');
   end;

@@ -2,6 +2,7 @@ export type QueueOperation = 'status' | 'join' | 'leave';
 export type QueueStatus = {
   enabled: boolean;
   state: 'idle' | 'waiting' | 'active' | 'expired' | 'cancelled' | 'complete';
+  // Waiting-only rank: 1 is next to enter; admitted sessions report 1.
   position: number;
   ahead: number;
   expiresAt: string | null;

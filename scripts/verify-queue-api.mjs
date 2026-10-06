@@ -85,44 +85,68 @@ try {
     'The initial page must offer Book Now before choosing a calendar slot');
   assert.doesNotMatch(initialHtml, /<table[\s>]/, 'The calendar stays hidden until admission');
   if (process.argv.includes('--serve')) {
-    await db.query('select pb_queue($1, $2)', ['f'.repeat(64), 'join']);
+    if (!process.argv.includes('--empty')) {
+      for (const token of ['d', 'e', 'f']) {
+        await db.query('select pb_queue($1, $2)', [token.repeat(64), 'join']);
+      }
+    }
     console.log(`UI_URL=${base}\nTEST_REST_URL=${restUrl}`);
     await new Promise((resolve) => { process.once('SIGINT', resolve); process.once('SIGTERM', resolve); });
   } else {
-    const a = client(), b = client(), c = client(), stranger = client();
-    await a.queue(); await b.queue(); await c.queue();
+    const a = client(), b = client(), c = client(), d = client(), e = client(), stranger = client();
+    await a.queue(); await b.queue(); await c.queue(); await d.queue(); await e.queue();
     assert.equal((await a.queue('join')).state, 'active');
-    assert.equal((await b.queue('join')).position, 2);
-    assert.equal((await c.queue('join')).position, 3);
-    assert.equal((await b.queue()).position, 2, 'Reload keeps cookie position');
-    const repeated = await Promise.all(Array.from({ length: 8 }, () => b.queue('join')));
-    assert.ok(repeated.every((result) => result.position === 2));
-    assert.equal((await db.query('select count(*)::int as n from pb_booking_queue')).rows[0].n, 3);
+    const bLease = await b.queue('join');
+    assert.equal(bLease.state, 'active');
+    assert.equal((await c.queue('join')).state, 'active');
+    assert.equal((await d.queue('join')).position, 1);
+    assert.equal((await e.queue('join')).position, 2);
+    assert.equal((await d.queue()).position, 1, 'Status polling keeps cookie position');
+    const repeated = await Promise.all(Array.from({ length: 8 }, () => d.queue('join')));
+    assert.ok(repeated.every((result) => result.state === 'waiting' && result.position === 1));
+    assert.equal((await db.query('select count(*)::int as n from pb_booking_queue')).rows[0].n, 5);
+    assert.equal((await db.query("select count(*)::int as n from pb_booking_queue where state = 'active'")).rows[0].n, 3);
     const day = (await db.query("select to_char(clock_timestamp() at time zone 'Asia/Seoul', 'YYYY-MM-DD') as day")).rows[0].day;
     const add = { type: 'addBookings', payload: { applicant: 'API Queue Test', channels: ['CH 1', 'CH 2'],
       startAt: `${day}T09:00`, endAt: `${day}T10:00`, purpose: '' } };
     assert.equal((await stranger.action(add)).ok, false);
-    assert.equal((await b.action(add)).ok, false);
+    assert.equal((await d.action(add)).ok, false, 'A fourth visitor cannot bypass the admission limit');
     const writes = await Promise.all([a.action(add), a.action(add)]);
     assert.equal(writes.filter((result) => result.ok).length, 1, 'Only one simultaneous submission consumes the lease');
     assert.equal(writes.find((result) => result.ok).snapshot.bookings[0].startAt, add.payload.startAt, 'Fixture preserves timestamp-without-time-zone values');
     assert.equal((await db.query('select count(*)::int as n from pb_bookings')).rows[0].n, 2);
     assert.equal((await db.query('select count(*)::int as n from pb_change_logs')).rows[0].n, 2);
     assert.equal((await b.queue()).state, 'active');
+    assert.equal((await b.queue()).expiresAt, bLease.expiresAt, 'Other bookings do not restart an active lease');
+    assert.equal((await d.queue()).state, 'active', 'Saving admits the oldest waiting visitor');
+    assert.equal((await e.queue()).position, 1);
     const existing = (await db.query('select id from pb_bookings limit 1')).rows[0].id;
     const edit = { type: 'updateBooking', payload: { id: existing, requestedBy: 'Test', channel: 'CH 3',
       startAt: `${day}T10:00`, endAt: `${day}T11:00`, purpose: '' } };
-    assert.equal((await c.action(edit)).ok, false, 'Editing cannot bypass queue');
+    assert.equal((await e.action(edit)).ok, false, 'Editing cannot bypass queue');
     assert.equal((await b.action(edit)).ok, true);
-    assert.equal((await c.queue()).state, 'active');
+    assert.equal((await e.queue()).state, 'active');
+    const competing = { type: 'addBookings', payload: { ...add.payload, channels: ['CH 1'],
+      startAt: `${day}T12:00`, endAt: `${day}T13:00` } };
+    const race = await Promise.all([c.action(competing), d.action(competing)]);
+    assert.equal(race.filter((result) => result.ok).length, 1, 'Two admitted visitors cannot book the same channel/time');
+    assert.equal((await (race[0].ok ? d : c).queue()).state, 'active', 'The unsuccessful visitor keeps their remaining time');
+    assert.equal((await db.query('select count(*)::int as n from pb_bookings')).rows[0].n, 3);
+    assert.equal((await db.query('select count(*)::int as n from pb_change_logs')).rows[0].n, 4);
     await db.exec("update pb_booking_queue set expires_at = clock_timestamp() - interval '1 second' where state = 'active'");
-    assert.equal((await c.action(edit)).ok, false);
+    assert.equal((await e.action(edit)).ok, false);
+    await e.queue();
+    const burst = await Promise.all(Array.from({ length: 12 }, () => client().queue('join')));
+    assert.equal(burst.filter((result) => result.state === 'active').length, 3, 'A burst admits only three sessions');
+    assert.deepEqual(burst.filter((result) => result.state === 'waiting').map((result) => result.position).sort((x, y) => x - y),
+      [1, 2, 3, 4, 5, 6, 7, 8, 9]);
+    assert.equal((await db.query("select count(*)::int as n from pb_booking_queue where state = 'active'")).rows[0].n, 3);
     const csrf = await stranger.post('/api/reservations/queue', { operation: 'join' }, { Origin: 'https://untrusted.example' });
     assert.equal(csrf.status, 403);
     databaseUnavailable = true;
     assert.equal((await a.post('/api/reservations/queue', { operation: 'join' })).status, 503, 'No bypass when database is down');
     assert.equal((await a.action(add)).ok, false);
-    console.log('PASS: real Next API, cookies/reload, duplicate joins, simultaneous writes, editing, expiry, CSRF and fail-closed outage');
+    console.log('PASS: real Next API, three-person admission, FIFO refill, 12-client burst, conflict/replay safety, editing, expiry, CSRF and outage');
   }
 } finally {
   child.kill();
