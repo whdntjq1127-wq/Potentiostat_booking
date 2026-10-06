@@ -418,6 +418,49 @@ button {
   grid-column: 1 / -1;
 }
 
+.admin-rule-help {
+  margin: 0;
+  font-size: 0.92rem;
+  line-height: 1.6;
+}
+
+.admin-rules-preview {
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  padding: 20px;
+  background: var(--primary-soft);
+}
+
+.admin-rules-preview h2,
+.admin-rules-flow h2 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.admin-rules-dates {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr));
+  gap: 16px;
+  margin: 8px 0;
+}
+
+.admin-rules-dates dt {
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.admin-rules-dates dd {
+  margin: 6px 0 0;
+  font-size: clamp(1rem, 2vw, 1.2rem);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+
+.admin-rules-flow {
+  padding: 4px 0;
+}
+
 .field label {
   font-size: 0.95rem;
   font-weight: 600;

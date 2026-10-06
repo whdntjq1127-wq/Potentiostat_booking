@@ -35,9 +35,6 @@ type EndOption = {
   timeLabel: string;
 };
 
-const QUEUE_SELECTION_KEY = 'potentiostat-queue-selection-v1';
-const QUEUE_ENTRY_KEY = 'potentiostat-queue-entry-v1';
-
 export default function Home() {
   const {
     ready,
@@ -50,7 +47,7 @@ export default function Home() {
     refresh,
   } = useReservation();
   const { copy, language } = useLanguage();
-  const queue = useBookingQueue();
+  const queue = useBookingQueue({ resetOnMount: true });
   const queueText = queueCopy[language];
   const [bookingRequested, setBookingRequested] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -75,36 +72,43 @@ export default function Home() {
   } | null>(null);
   useEffect(() => {
     try {
-      if (sessionStorage.getItem(QUEUE_ENTRY_KEY) === 'entered') setBookingRequested(true);
-      const saved = JSON.parse(sessionStorage.getItem(QUEUE_SELECTION_KEY) ?? 'null');
-      if (saved && CHANNELS.includes(saved.channel) && typeof saved.startAt === 'string' && typeof saved.endAt === 'string'
-        && (!saved.channels || (Array.isArray(saved.channels) && saved.channels.every((channel: Channel) => CHANNELS.includes(channel))))) {
-        setSelectedSlot(saved);
-        setEndAt(saved.endAt);
-        setBookingRequested(true);
-      }
-    } catch { /* Storage is optional; the queue cookie remains server-owned. */ }
+      // Remove legacy drafts; a fresh page must never restore admission or a form.
+      sessionStorage.removeItem('potentiostat-queue-entry-v1');
+      sessionStorage.removeItem('potentiostat-queue-selection-v1');
+    } catch { /* Optional storage. */ }
   }, []);
 
   useEffect(() => {
     if (queue.status?.state === 'active') void refresh();
-    if (queue.status?.state === 'expired' || queue.status?.state === 'cancelled') {
-      setSelectedSlot(null);
-      setEndAt('');
-      try { sessionStorage.removeItem(QUEUE_SELECTION_KEY); } catch { /* Optional. */ }
-    }
   }, [queue.status?.state, refresh]);
 
+  const turnExpired = queue.status?.state === 'expired' || (queue.status?.state === 'active' && queue.remaining <= 0);
+  useEffect(() => {
+    if (!bookingRequested || queue.busy || !turnExpired) return;
+    resetBookingScreen();
+    setMessage({ ok: false, text: queueText.returned });
+    void queue.leave();
+  }, [bookingRequested, queue.busy, turnExpired, queueText.returned]);
+
+  function resetBookingScreen() {
+    setBookingRequested(false);
+    setSelectedSlot(null);
+    setSelectedChannels([]);
+    setApplicant('');
+    setPurpose('');
+    setBookingPassword('');
+    setEndAt('');
+    setCancellingBookings([]);
+    setCancelPassword('');
+    setCancelMessage(null);
+  }
+
   async function startBooking() {
-    if (submitting || queue.busy || !ready) return;
+    if (submitting || queue.busy || !ready || !queue.ready) return;
     setBookingRequested(true);
     setSelectedSlot(null);
     setEndAt('');
     setMessage(null);
-    try {
-      sessionStorage.setItem(QUEUE_ENTRY_KEY, 'entered');
-      sessionStorage.removeItem(QUEUE_SELECTION_KEY);
-    } catch { /* Optional. */ }
     await queue.join();
   }
 
@@ -113,21 +117,13 @@ export default function Home() {
     setSelectedSlot(null);
     setEndAt('');
     setMessage(null);
-    try { sessionStorage.removeItem(QUEUE_SELECTION_KEY); } catch { /* Optional. */ }
   }
 
   async function exitBooking() {
     if (submitting || queue.busy) return;
-    const result = await queue.leave();
-    if (!result) return;
-    setBookingRequested(false);
-    setSelectedSlot(null);
-    setEndAt('');
-    setCancellingBookings([]);
-    try {
-      sessionStorage.removeItem(QUEUE_ENTRY_KEY);
-      sessionStorage.removeItem(QUEUE_SELECTION_KEY);
-    } catch { /* Optional. */ }
+    resetBookingScreen();
+    setMessage(null);
+    await queue.leave();
   }
 
   useEffect(() => {
@@ -309,12 +305,12 @@ export default function Home() {
     );
   }, [channelAvailability, selectedSlot]);
 
-  if (!ready || !mounted || !now || !weekAnchor || !bookingRequested || (!queue.canBook && !submitting)) {
+  if (!ready || !mounted || !now || !weekAnchor || !bookingRequested || !queue.canBook) {
     return (
       <main className="booking-entry-page">
         <section className="booking-start" aria-label={queueText.book}>
           <button type="button" className="booking-start-button" onClick={() => void startBooking()}
-            disabled={!ready || !mounted || !queue.status || submitting || queue.busy}
+            disabled={!ready || !mounted || !queue.ready || !queue.status || submitting || queue.busy}
             aria-busy={!queue.status || queue.busy}>
             <span>{queueText.book}</span>
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14m-6-6 6 6-6 6" /></svg>
@@ -322,7 +318,7 @@ export default function Home() {
           {message ? <p role="status" className={`inline-message ${message.ok ? 'success' : 'error'}`}>{message.text}</p> : null}
           {queue.error && !bookingRequested ? <p role="alert" className="inline-message error">{queueText.error}</p> : null}
         </section>
-        {bookingRequested && !submitting ? <BookingQueuePanel queue={queue} onClose={() => void exitBooking()} /> : null}
+        {bookingRequested && !submitting && !turnExpired ? <BookingQueuePanel queue={queue} onClose={() => void exitBooking()} /> : null}
       </main>
     );
   }
@@ -425,7 +421,6 @@ export default function Home() {
               setSelectedSlot(slot);
               setEndAt(slot.endAt);
               setMessage(null);
-              try { sessionStorage.setItem(QUEUE_SELECTION_KEY, JSON.stringify(slot)); } catch { /* Optional. */ }
             }}
             onCancelBooking={(booking) => {
               setCancellingBookings([booking]);
@@ -447,7 +442,7 @@ export default function Home() {
           />
       </section>
 
-      {selectedSlot && bookingRequested && (queue.canBook || submitting) ? (
+      {selectedSlot && bookingRequested && queue.canBook ? (
         <div className="modal-overlay" onClick={dismissBookingForm}>
           <section
             className="modal-card"
@@ -508,17 +503,7 @@ export default function Home() {
                 await queue.refresh();
 
                 if (result.ok) {
-                  setBookingRequested(false);
-                  try {
-                    sessionStorage.removeItem(QUEUE_ENTRY_KEY);
-                    sessionStorage.removeItem(QUEUE_SELECTION_KEY);
-                  } catch { /* Optional. */ }
-                  setSelectedSlot(null);
-                  setSelectedChannels([]);
-                  setApplicant('');
-                  setPurpose('');
-                  setBookingPassword('');
-                  setEndAt('');
+                  resetBookingScreen();
                 }
               }}
             >

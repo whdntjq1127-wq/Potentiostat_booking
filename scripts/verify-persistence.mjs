@@ -67,6 +67,7 @@ function startNextServer({ port, storeFile }) {
       RESERVATION_STORE_FILE: storeFile,
       SUPABASE_URL: '',
       SUPABASE_SERVICE_ROLE_KEY: '',
+      RESERVATION_QUEUE_ENABLED: 'false',
     },
     stdio: ['ignore', 'pipe', 'pipe'],
   });
@@ -139,9 +140,15 @@ async function readSnapshot(baseUrl) {
 }
 
 async function createBooking(baseUrl, booking) {
+  const admission = await fetch(`${baseUrl}/api/reservations/queue`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ operation: 'join' }),
+  });
+  if (!admission.ok) throw new Error('Failed to obtain a test booking turn.');
+  const cookie = admission.headers.get('set-cookie')?.split(';')[0] ?? '';
   const response = await fetch(`${baseUrl}/api/reservations/actions`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', Cookie: cookie },
     body: JSON.stringify({
       type: 'addBookings',
       payload: {

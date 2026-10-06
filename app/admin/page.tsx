@@ -3,13 +3,18 @@
 import type { CSSProperties } from 'react';
 import { useEffect, useState } from 'react';
 import { useReservation } from '../../components/reservation-context';
+import { useLanguage } from '../../components/language-context';
+import { AdminBookingRuleFields } from '../../components/admin-booking-rule-fields';
 import {
   formatBookingRange,
+  getBookingToday,
   getChannelColor,
   toDateKey,
 } from '../../lib/reservation-data';
 
 export default function AdminPage() {
+  const { language, copy } = useLanguage();
+  const rulesCopy = copy.adminRules;
   const {
     ready,
     bookings,
@@ -25,6 +30,8 @@ export default function AdminPage() {
   } = useReservation();
   const [settingsDraft, setSettingsDraft] = useState(settings);
   const [settingsMessage, setSettingsMessage] = useState<string | null>(null);
+  const [savingSettings, setSavingSettings] = useState(false);
+  const [rulesNow, setRulesNow] = useState<Date | null>(null);
   const [blockedDateInput, setBlockedDateInput] = useState('');
   const [blockedMessage, setBlockedMessage] = useState<string | null>(null);
   const [noticeInput, setNoticeInput] = useState('');
@@ -34,6 +41,22 @@ export default function AdminPage() {
   const [authMessage, setAuthMessage] = useState<string | null>(null);
   const [authChecked, setAuthChecked] = useState(false);
   const [authenticated, setAuthenticated] = useState(false);
+
+  useEffect(() => {
+    let day = '';
+    const syncDate = () => {
+      const now = new Date();
+      const nextDay = toDateKey(getBookingToday(now));
+      if (day !== nextDay) {
+        day = nextDay;
+        setRulesNow(now);
+      }
+    };
+    syncDate();
+    const timer = setInterval(syncDate, 1000);
+    window.addEventListener('focus', syncDate);
+    return () => { clearInterval(timer); window.removeEventListener('focus', syncDate); };
+  }, []);
 
   useEffect(() => {
     setSettingsDraft(settings);
@@ -116,13 +139,9 @@ export default function AdminPage() {
       <section className="panel">
         <div className="section-head">
           <div>
-            <div className="eyebrow">Booking Rules</div>
-            <h1 className="section-title">Admin Settings</h1>
-            <p className="muted">
-              Bookable days include today (Korea time). For example, 3 opens today,
-              tomorrow, and the following day. All bookings must end by midnight
-              after the last open day, even if the maximum usage duration is longer.
-            </p>
+            <div className="eyebrow">{rulesCopy.eyebrow}</div>
+            <h1 className="section-title">{rulesCopy.title}</h1>
+            <p className="muted">{rulesCopy.intro}</p>
           </div>
           <button
             type="button"
@@ -132,7 +151,7 @@ export default function AdminPage() {
               setAuthenticated(false);
             }}
           >
-            Lock
+            {rulesCopy.lock}
           </button>
         </div>
 
@@ -140,50 +159,30 @@ export default function AdminPage() {
           className="form-grid section"
           onSubmit={async (event) => {
             event.preventDefault();
-            const result = await updateSettings(settingsDraft);
-            setSettingsMessage(result.message);
+            if (savingSettings) return;
+            setSavingSettings(true);
+            setSettingsMessage(null);
+            try {
+              const result = await updateSettings(settingsDraft);
+              setSettingsMessage(result.ok ? rulesCopy.saved : result.message);
+            } catch {
+              setSettingsMessage(rulesCopy.saveError);
+            } finally {
+              setSavingSettings(false);
+            }
           }}
         >
-          <div className="field">
-            <label htmlFor="booking-window">Bookable Days (including today)</label>
-            <input
-              id="booking-window"
-              type="number"
-              min={1}
-              value={settingsDraft.bookingWindowDays}
-              onChange={(event) =>
-                setSettingsDraft((current) => ({
-                  ...current,
-                  bookingWindowDays: Number(event.target.value),
-                }))
-              }
-            />
-          </div>
-
-          <div className="field">
-            <label htmlFor="max-duration">Maximum Usage Duration (days)</label>
-            <input
-              id="max-duration"
-              type="number"
-              min={1}
-              value={settingsDraft.maxDurationDays}
-              onChange={(event) =>
-                setSettingsDraft((current) => ({
-                  ...current,
-                  maxDurationDays: Number(event.target.value),
-                }))
-              }
-            />
-          </div>
+          <AdminBookingRuleFields language={language} now={rulesNow} settings={settingsDraft}
+            disabled={savingSettings} onChange={(next) => { setSettingsDraft(next); setSettingsMessage(null); }} />
 
           <div className="action-row">
-            <button className="button" type="submit">
-              Save Rules
+            <button className="button" type="submit" disabled={savingSettings}>
+              {savingSettings ? rulesCopy.saving : rulesCopy.save}
             </button>
           </div>
         </form>
 
-        {settingsMessage ? <div className="inline-message">{settingsMessage}</div> : null}
+        {settingsMessage ? <div className="inline-message" role="status">{settingsMessage}</div> : null}
       </section>
 
       <section className="dashboard-grid">

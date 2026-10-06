@@ -3,11 +3,13 @@
 import { useEffect, useRef, useState } from 'react';
 import type { QueueOperation, QueueStatus } from '../lib/booking-queue';
 
-export function useBookingQueue() {
+export function useBookingQueue({ resetOnMount = false } = {}) {
   const [status, setStatus] = useState<QueueStatus | null>(null);
   const [error, setError] = useState(false);
   const [busy, setBusy] = useState(false);
   const [remaining, setRemaining] = useState(0);
+  const [ready, setReady] = useState(!resetOnMount);
+  const initialized = useRef(!resetOnMount);
   const inFlight = useRef<Promise<QueueStatus | null> | null>(null);
   const deadline = useRef(0);
   const alive = useRef(true);
@@ -55,13 +57,17 @@ export function useBookingQueue() {
     let cancelled = false;
     let timer: ReturnType<typeof setTimeout>;
     const poll = async () => {
-      await request('status');
+      const next = await request(initialized.current ? 'status' : 'leave');
       if (cancelled) return;
+      if (next && !initialized.current) {
+        initialized.current = true;
+        setReady(true);
+      }
       const state = latest.current?.state;
       timer = setTimeout(poll, state === 'waiting' || state === 'active' ? 2000 : 15000);
     };
     void poll();
-    const sync = () => { if (document.visibilityState === 'visible') void request('status'); };
+    const sync = () => { if (initialized.current && document.visibilityState === 'visible') void request('status'); };
     window.addEventListener('focus', sync);
     document.addEventListener('visibilitychange', sync);
     const countdown = setInterval(() => setRemaining(Math.max(0, Math.ceil((deadline.current - performance.now()) / 1000))), 250);
@@ -73,11 +79,11 @@ export function useBookingQueue() {
       window.removeEventListener('focus', sync);
       document.removeEventListener('visibilitychange', sync);
     };
-  }, [status?.state]);
+  }, [status?.state, resetOnMount]);
 
   return {
-    status, error, busy, remaining,
-    canBook: !!status && !error && (!status.enabled || (status.state === 'active' && remaining > 0)),
+    status, error, busy, remaining, ready,
+    canBook: ready && !!status && !error && status.state === 'active' && remaining > 0,
     join: () => request('join'), leave: () => request('leave'), refresh: () => request('status'),
   };
 }
