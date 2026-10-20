@@ -162,7 +162,8 @@ begin
     insert into public.pb_change_logs (id, actor, action, summary, created_at, booking_id, expires_at)
       select id, actor, action, summary, created_at, booking_id, expires_at
       from jsonb_populate_recordset(null::public.pb_change_logs, p_logs);
-    update public.pb_booking_queue set state = 'complete', active_slot = null, heartbeat_at = v_now where session_hash = p_session;
+    -- Successful writes keep the slot and original deadline for further bookings.
+    update public.pb_booking_queue set heartbeat_at = v_now where session_hash = p_session;
   exception when exclusion_violation then
     return jsonb_build_object('ok', false, 'message', 'A selected channel was just booked. Please choose another time.');
   end;

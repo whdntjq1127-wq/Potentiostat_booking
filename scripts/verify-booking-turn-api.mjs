@@ -73,12 +73,23 @@ try {
     assert.equal(saved.ok, true);
     assert.deepEqual(saved.snapshot.bookings.filter((item) => item.applicant === 'Turn API Test')
       .map((item) => item.channel).sort(), ['CH 4', 'CH 5']);
-    assert.equal((await queue('status')).data.state, 'idle', 'Saving consumes the browser turn');
-    await queue('join');
+    const retained = (await queue('status')).data;
+    assert.equal(retained.state, 'active', 'Saving preserves the browser turn');
+    assert.equal(retained.expiresAt, first.data.expiresAt);
+    const second = { ...booking, payload: { ...booking.payload, startAt: `${day}T03:00`, endAt: `${day}T04:00` } };
+    const secondSave = await post('/api/reservations/actions', second);
+    assert.equal(secondSave.data.ok, true, 'Another booking is allowed without rejoining');
+    assert.equal(secondSave.setCookie, null, 'Saving neither removes nor renews the turn cookie');
+    const savedBooking = secondSave.data.snapshot.bookings.find((item) => item.startAt === second.payload.startAt);
+    const edit = { type: 'updateBooking', payload: { id: savedBooking.id, requestedBy: 'Turn API Test',
+      channel: savedBooking.channel, startAt: `${day}T05:00`, endAt: `${day}T06:00`, purpose: '' } };
+    assert.equal((await post('/api/reservations/actions', edit)).data.ok, true);
+    assert.equal((await queue('join')).data.expiresAt, first.data.expiresAt, 'Saving/editing/rejoining never restarts the clock');
+    assert.equal((await post('/api/reservations/actions', second, signedCookie(Date.now() - 120001))).status, 403);
     assert.equal((await queue('leave')).data.state, 'idle');
     assert.equal((await post('/api/reservations/actions', booking)).status, 403);
     assert.equal((await queue('invalid')).status, 400);
-    console.log('PASS: non-queue turn admission, fixed deadline, expiry, tampering, save and leave');
+    console.log('PASS: non-queue repeated saves/edits, fixed deadline, expiry, tampering and leave');
   }
 } finally {
   child.kill();

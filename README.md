@@ -63,6 +63,19 @@ Run `node scripts/verify-five-channels.cjs` and
 `node scripts/verify-five-channels-sql.mjs` to check the five-channel upgrade
 using isolated data.
 
+### Multiple Bookings Per Admission
+
+Successful saves close the form but keep the calendar open for additional
+reservations. Every save/edit shares the **original two-minute deadline**:
+admission at 00:00:00 still ends at 00:02:00, regardless of how many saves occur.
+Exit Booking, refreshing Home and timeout continue to release admission.
+
+Existing queue installations must rerun the complete updated
+`database/booking-queue.sql`, **even if the five-channel update was already run**,
+then deploy the updated app. The SQL retains the admission slot after saving;
+the UI and non-queue API must also be updated. Existing records and deadlines
+are preserved. See `docs/BOOKING_QUEUE_SETUP.md` for rollout and tests.
+
 ### Booking Window
 
 The default window is three calendar days **including today**, using Asia/Seoul

@@ -25,9 +25,7 @@ export async function POST(request: Request) {
       queueSession: session ? hashQueueCookie(session) : undefined,
     });
 
-    const response = NextResponse.json(result, { status: result.ok ? 200 : 400 });
-    if (timedWrite && result.ok) response.cookies.delete(BOOKING_TURN_COOKIE);
-    return response;
+    return NextResponse.json(result, { status: result.ok ? 200 : 400 });
   } catch (error) {
     return NextResponse.json(
       {

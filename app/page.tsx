@@ -486,7 +486,8 @@ export default function Home() {
                 await queue.refresh();
 
                 if (result.ok) {
-                  resetBookingScreen();
+                  setSelectedSlot(null);
+                  setEndAt('');
                 }
               }}
             >

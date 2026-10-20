@@ -95,7 +95,8 @@ try {
   } else {
     const a = client(), b = client(), c = client(), d = client(), e = client(), stranger = client();
     await a.queue(); await b.queue(); await c.queue(); await d.queue(); await e.queue();
-    assert.equal((await a.queue('join')).state, 'active');
+    const aLease = await a.queue('join');
+    assert.equal(aLease.state, 'active');
     const bLease = await b.queue('join');
     assert.equal(bLease.state, 'active');
     assert.equal((await c.queue('join')).state, 'active');
@@ -112,27 +113,39 @@ try {
     assert.equal((await stranger.action(add)).ok, false);
     assert.equal((await d.action(add)).ok, false, 'A fourth visitor cannot bypass the admission limit');
     const writes = await Promise.all([a.action(add), a.action(add)]);
-    assert.equal(writes.filter((result) => result.ok).length, 1, 'Only one simultaneous submission consumes the lease');
+    assert.equal(writes.filter((result) => result.ok).length, 1, 'Duplicate simultaneous reservations save only once');
     assert.equal(writes.find((result) => result.ok).snapshot.bookings[0].startAt, add.payload.startAt, 'Fixture preserves timestamp-without-time-zone values');
     assert.equal((await db.query('select count(*)::int as n from pb_bookings')).rows[0].n, 2);
     assert.equal((await db.query('select count(*)::int as n from pb_change_logs')).rows[0].n, 2);
+    assert.equal((await a.queue()).state, 'active', 'Saving keeps admission');
+    assert.equal((await a.queue()).expiresAt, aLease.expiresAt);
+    assert.equal((await d.queue()).state, 'waiting', 'Saving does not release an admission slot');
+    const additional = { type: 'addBookings', payload: { ...add.payload, channels: ['CH 4'],
+      startAt: `${day}T14:00`, endAt: `${day}T15:00` } };
+    assert.equal((await a.action(additional)).ok, true, 'Same admission can save another reservation');
+    assert.equal((await a.queue('join')).expiresAt, aLease.expiresAt, 'Repeated saves and joins keep the original expiry');
     assert.equal((await b.queue()).state, 'active');
     assert.equal((await b.queue()).expiresAt, bLease.expiresAt, 'Other bookings do not restart an active lease');
-    assert.equal((await d.queue()).state, 'active', 'Saving admits the oldest waiting visitor');
+    await a.queue('leave');
+    assert.equal((await d.queue()).state, 'active', 'Exit admits the oldest waiting visitor');
     assert.equal((await e.queue()).position, 1);
     const existing = (await db.query('select id from pb_bookings limit 1')).rows[0].id;
     const edit = { type: 'updateBooking', payload: { id: existing, requestedBy: 'Test', channel: 'CH 3',
       startAt: `${day}T10:00`, endAt: `${day}T11:00`, purpose: '' } };
     assert.equal((await e.action(edit)).ok, false, 'Editing cannot bypass queue');
     assert.equal((await b.action(edit)).ok, true);
+    assert.equal((await b.queue()).expiresAt, bLease.expiresAt, 'Editing preserves the original expiry too');
+    assert.equal((await e.queue()).state, 'waiting');
+    await b.queue('leave');
     assert.equal((await e.queue()).state, 'active');
     const competing = { type: 'addBookings', payload: { ...add.payload, channels: ['CH 1'],
       startAt: `${day}T12:00`, endAt: `${day}T13:00` } };
     const race = await Promise.all([c.action(competing), d.action(competing)]);
     assert.equal(race.filter((result) => result.ok).length, 1, 'Two admitted visitors cannot book the same channel/time');
     assert.equal((await (race[0].ok ? d : c).queue()).state, 'active', 'The unsuccessful visitor keeps their remaining time');
-    assert.equal((await db.query('select count(*)::int as n from pb_bookings')).rows[0].n, 3);
-    assert.equal((await db.query('select count(*)::int as n from pb_change_logs')).rows[0].n, 4);
+    assert.equal((await (race[0].ok ? c : d).queue()).state, 'active', 'The successful visitor keeps their remaining time too');
+    assert.equal((await db.query('select count(*)::int as n from pb_bookings')).rows[0].n, 4);
+    assert.equal((await db.query('select count(*)::int as n from pb_change_logs')).rows[0].n, 5);
     await db.exec("update pb_booking_queue set expires_at = clock_timestamp() - interval '1 second' where state = 'active'");
     assert.equal((await e.action(edit)).ok, false);
     await e.queue();
@@ -150,6 +163,7 @@ try {
       channel: 'CH 5', startAt: `${day}T16:00`, endAt: `${day}T17:00` } });
     assert.equal(updated.ok, true, updated.message);
     assert.equal(updated.snapshot.bookings.find((booking) => booking.id === newBooking.id).channel, 'CH 5');
+    await five.queue('leave');
     const burst = await Promise.all(Array.from({ length: 12 }, () => client().queue('join')));
     assert.equal(burst.filter((result) => result.state === 'active').length, 3, 'A burst admits only three sessions');
     assert.deepEqual(burst.filter((result) => result.state === 'waiting').map((result) => result.position).sort((x, y) => x - y),
@@ -160,7 +174,7 @@ try {
     databaseUnavailable = true;
     assert.equal((await a.post('/api/reservations/queue', { operation: 'join' })).status, 503, 'No bypass when database is down');
     assert.equal((await a.action(add)).ok, false);
-    console.log('PASS: real Next API, five-channel create/edit, three-person admission, FIFO refill, 12-client burst, conflicts, expiry, CSRF and outage');
+    console.log('PASS: real Next API, repeated create/edit with fixed expiry, five channels, three-person FIFO, burst, conflicts, CSRF and outage');
   }
 } finally {
   child.kill();
