@@ -321,7 +321,10 @@ export function WeeklySchedule({
       </div>
 
       <div className="schedule-wrap">
-        <table className="schedule-table">
+        <table
+          className="schedule-table"
+          style={{ '--schedule-min-width': `${108 + weekDates.length * CHANNELS.length * 74}px` } as CSSProperties}
+        >
           <thead>
             <tr>
               <th className="corner-cell time-head" rowSpan={2}>

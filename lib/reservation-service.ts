@@ -3,6 +3,7 @@ import {
   timingSafeEqual,
 } from 'crypto';
 import {
+  CHANNELS,
   buildBookingSummary,
   compareBookings,
   compareChangeLogs,
@@ -325,6 +326,9 @@ export async function applyReservationAction(
       const trimmedApplicant = applicant.trim();
       const trimmedPurpose = purpose.trim();
       const trimmedPassword = (password ?? '').trim();
+      if (!Array.isArray(channels) || channels.some((channel) => !CHANNELS.includes(channel))) {
+        return response({ ok: false, message: `Select valid channels: ${CHANNELS.join(', ')}.` });
+      }
       const selectedChannels = Array.from(new Set(channels));
 
       if (!trimmedApplicant) {
@@ -419,6 +423,9 @@ export async function applyReservationAction(
 
     case 'updateBooking': {
       const { id, requestedBy, channel, startAt, endAt, purpose } = action.payload;
+      if (!CHANNELS.includes(channel)) {
+        return response({ ok: false, message: `Select a valid channel: ${CHANNELS.join(', ')}.` });
+      }
       const target = snapshot.bookings.find((booking) => booking.id === id);
 
       if (!target) {

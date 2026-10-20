@@ -7,7 +7,7 @@ import { SiteShell } from '../components/site-shell';
 export const metadata: Metadata = {
   title: 'Potentiostat Booking Board',
   description:
-    'A Potentiostat demo site for managing CH 1, CH 2, and CH 3 bookings by name only',
+    'A Potentiostat site for managing CH 1 through CH 5 bookings by name only',
 };
 
 export default function RootLayout({

@@ -62,14 +62,17 @@ try {
     assert.equal((await queue('status')).data.expiresAt, first.data.expiresAt);
     assert.equal((await queue('join')).data.expiresAt, first.data.expiresAt, 'Repeated entry cannot extend an active turn');
     const day = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Seoul', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
-    const booking = { type: 'addBookings', payload: { applicant: 'Turn API Test', channels: ['CH 3'],
+    const booking = { type: 'addBookings', payload: { applicant: 'Turn API Test', channels: ['CH 4', 'CH 5'],
       startAt: `${day}T01:00`, endAt: `${day}T02:00`, purpose: '' } };
     for (const invalid of ['', 'pb_booking_turn=tampered', signedCookie(Date.now() - 120001)]) {
       assert.equal((await post('/api/reservations/actions', booking, invalid)).status, 403);
       assert.equal((await post('/api/reservations/actions', { type: 'updateBooking', payload: {} }, invalid)).status, 403);
     }
     assert.equal((await queue('status', signedCookie(Date.now() - 120001))).data.state, 'expired');
-    assert.equal((await post('/api/reservations/actions', booking)).data.ok, true);
+    const saved = (await post('/api/reservations/actions', booking)).data;
+    assert.equal(saved.ok, true);
+    assert.deepEqual(saved.snapshot.bookings.filter((item) => item.applicant === 'Turn API Test')
+      .map((item) => item.channel).sort(), ['CH 4', 'CH 5']);
     assert.equal((await queue('status')).data.state, 'idle', 'Saving consumes the browser turn');
     await queue('join');
     assert.equal((await queue('leave')).data.state, 'idle');

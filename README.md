@@ -45,7 +45,25 @@ Important: Render persistent disks require a paid web service plan. Free Render
 web services have an ephemeral filesystem. The app will still work by writing a
 local JSON file, but that file can be lost on deploy, restart, and spin-down.
 
-### Booking window
+### Equipment Channels
+
+Equipment channels are CH 1 through CH 5. The calendar, multi-channel picker and
+booking edits support all five; overlaps are still prohibited per channel.
+The booking queue still admits **three visitors**, each with a two-minute turn.
+Equipment channel count and visitor admission capacity are independent.
+
+For an existing Supabase installation, run the complete updated
+`database/booking-queue.sql` **before deploying this five-channel version**.
+It widens the channel check and queue batch-write limit without deleting or
+resetting existing records. Running only the fresh-install `schema.sql` does not
+replace an older channel constraint. Keep the existing Render environment values;
+`RESERVATION_QUEUE_ENABLED=true` remains necessary only for queued admission.
+
+Run `node scripts/verify-five-channels.cjs` and
+`node scripts/verify-five-channels-sql.mjs` to check the five-channel upgrade
+using isolated data.
+
+### Booking Window
 
 The default window is three calendar days **including today**, using Asia/Seoul
 time. On October 2, October 2-4 are open. The last bookable hour is October 4

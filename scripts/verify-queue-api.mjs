@@ -136,6 +136,20 @@ try {
     await db.exec("update pb_booking_queue set expires_at = clock_timestamp() - interval '1 second' where state = 'active'");
     assert.equal((await e.action(edit)).ok, false);
     await e.queue();
+    const five = client();
+    await five.queue('join');
+    const allChannels = ['CH 1', 'CH 2', 'CH 3', 'CH 4', 'CH 5'];
+    const all = await five.action({ type: 'addBookings', payload: { ...add.payload, applicant: 'Five Channel API Test',
+      channels: allChannels, startAt: `${day}T15:00`, endAt: `${day}T16:00` } });
+    assert.equal(all.ok, true, all.message);
+    assert.deepEqual(all.snapshot.bookings.filter((booking) => booking.applicant === 'Five Channel API Test')
+      .map((booking) => booking.channel).sort(), allChannels);
+    await five.queue('join');
+    const newBooking = all.snapshot.bookings.find((booking) => booking.applicant === 'Five Channel API Test' && booking.channel === 'CH 4');
+    const updated = await five.action({ type: 'updateBooking', payload: { ...edit.payload, id: newBooking.id,
+      channel: 'CH 5', startAt: `${day}T16:00`, endAt: `${day}T17:00` } });
+    assert.equal(updated.ok, true, updated.message);
+    assert.equal(updated.snapshot.bookings.find((booking) => booking.id === newBooking.id).channel, 'CH 5');
     const burst = await Promise.all(Array.from({ length: 12 }, () => client().queue('join')));
     assert.equal(burst.filter((result) => result.state === 'active').length, 3, 'A burst admits only three sessions');
     assert.deepEqual(burst.filter((result) => result.state === 'waiting').map((result) => result.position).sort((x, y) => x - y),
@@ -146,7 +160,7 @@ try {
     databaseUnavailable = true;
     assert.equal((await a.post('/api/reservations/queue', { operation: 'join' })).status, 503, 'No bypass when database is down');
     assert.equal((await a.action(add)).ok, false);
-    console.log('PASS: real Next API, three-person admission, FIFO refill, 12-client burst, conflict/replay safety, editing, expiry, CSRF and outage');
+    console.log('PASS: real Next API, five-channel create/edit, three-person admission, FIFO refill, 12-client burst, conflicts, expiry, CSRF and outage');
   }
 } finally {
   child.kill();

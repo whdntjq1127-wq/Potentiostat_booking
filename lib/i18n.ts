@@ -8,7 +8,7 @@ export const languageOptions: Array<{ value: Language; label: string }> = [
 const en = {
   site: {
     brandTitle: 'Potentiostat Booking Board',
-    brandSubtitle: 'CH 1, CH 2, CH 3 integrated booking demo',
+    brandSubtitle: 'CH 1 - CH 5 integrated booking',
     footer:
       'This is a browser-only demo. There is no login, and admin rules are stored only in the current browser.',
     languageLabel: 'Language',
@@ -94,7 +94,7 @@ const en = {
 const ko: typeof en = {
   site: {
     brandTitle: '포텐쇼스탯 예약 보드',
-    brandSubtitle: 'CH 1, CH 2, CH 3 통합 예약 데모',
+    brandSubtitle: 'CH 1 ~ CH 5 통합 예약',
     footer:
       '이 데모는 브라우저에서만 동작합니다. 로그인은 없으며 관리자 규칙은 현재 브라우저에만 저장됩니다.',
     languageLabel: '언어',

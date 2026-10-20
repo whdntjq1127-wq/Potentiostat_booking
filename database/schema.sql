@@ -3,7 +3,7 @@ create extension if not exists btree_gist;
 create table if not exists pb_bookings (
   id text primary key,
   applicant text not null,
-  channel text not null check (channel in ('CH 1', 'CH 2', 'CH 3')),
+  channel text not null check (channel in ('CH 1', 'CH 2', 'CH 3', 'CH 4', 'CH 5')),
   start_at timestamp without time zone not null,
   end_at timestamp without time zone not null,
   purpose text not null default '',

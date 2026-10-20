@@ -1,4 +1,4 @@
-export const CHANNELS = ['CH 1', 'CH 2', 'CH 3'] as const;
+export const CHANNELS = ['CH 1', 'CH 2', 'CH 3', 'CH 4', 'CH 5'] as const;
 
 export type Channel = (typeof CHANNELS)[number];
 
@@ -6,6 +6,8 @@ export const CHANNEL_COLORS: Record<Channel, string> = {
   'CH 1': '#8B919A',
   'CH 2': '#A8AEB6',
   'CH 3': '#C8CDD3',
+  'CH 4': '#D9DDE2',
+  'CH 5': '#E8EBEF',
 };
 
 export type BookingStatus = 'active' | 'cancelled';
@@ -225,6 +227,8 @@ export function getChannelSoftColor(channel: Channel) {
     'CH 1': '#E3E5E8',
     'CH 2': '#ECEDEF',
     'CH 3': '#F4F5F6',
+    'CH 4': '#F7F8F9',
+    'CH 5': '#FAFBFC',
   };
 
   return softMap[channel];

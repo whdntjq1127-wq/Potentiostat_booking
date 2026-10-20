@@ -643,7 +643,7 @@ button {
 
 .schedule-table {
   width: 100%;
-  min-width: max(100%, 1660px);
+  min-width: max(100%, var(--schedule-min-width, 1660px));
   border-collapse: separate;
   border-spacing: 0;
   position: relative;
@@ -934,7 +934,7 @@ button {
 
 .channel-picker {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 10px;
 }
 
@@ -1068,7 +1068,7 @@ button {
   }
 
   .channel-picker {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }
 

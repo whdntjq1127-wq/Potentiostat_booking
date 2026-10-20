@@ -2,11 +2,20 @@
 
 The queue is implemented in this repository but is OFF until explicitly enabled. The Book Now button starts a two-minute booking session even with the queue OFF. Existing reservations are not migrated, replaced or deleted by queue setup. The refresh/timeout UI update needs no additional SQL migration.
 
+## Upgrade To Five Equipment Channels
+
+The latest application has five equipment channels (CH 1 through CH 5), while
+visitor admission remains capped at three. To upgrade an existing three-channel
+installation, run the entire updated `database/booking-queue.sql` before deploying
+the app. This widens the `pb_bookings_channel_check` constraint and permits up to
+five booking rows in one atomic queue commit. Existing bookings and settings are
+preserved, and the visitor capacity and two-minute timer do not change.
+
 ## Upgrade From One To Three People
 
 This capacity change DOES require SQL, unlike the earlier refresh/timeout UI update. Run the entire updated `database/booking-queue.sql` once in the existing Supabase project's SQL Editor, then deploy the updated application. If the queue has not been enabled, set `RESERVATION_QUEUE_ENABLED=true` in Render and save/deploy. Without that flag, admission is not limited to three.
 
-The transaction replaces only the one-active-ticket index and queue functions, adds three constrained admission slots, and preserves bookings, change logs, settings, tickets and existing deadlines. It is safe to reapply. Do not delete tables, recreate the project or rerun `schema.sql` just to upgrade an existing queue. Apply SQL before the UI deploy so the displayed capacity matches the database. The slot numbers are internal admission seats, not CH 1/2/3 assignments.
+The transaction replaces the old one-active-ticket index and queue functions, widens the channel constraint, adds three constrained admission slots, and preserves bookings, change logs, settings, tickets and existing deadlines. It is safe to reapply. Do not delete tables, recreate the project or rerun `schema.sql` just to upgrade an existing queue. Apply SQL before the UI deploy so the displayed capacity matches the database. The slot numbers are internal admission seats, not equipment channel assignments.
 
 ## One-time activation
 
@@ -44,6 +53,8 @@ If setup has not been completed, no fake waiting order is displayed. If enabled 
 - `node scripts/verify-booking-turn-api.mjs`
 - `node scripts/verify-queue-sql.mjs`
 - `node scripts/verify-queue-capacity.mjs`
+- `node scripts/verify-five-channels.cjs`
+- `node scripts/verify-five-channels-sql.mjs`
 - `pnpm build` then `node scripts/verify-queue-api.mjs`
 - Existing booking-window, persistence, and legacy-recovery scripts should also pass with queue mode disabled.
 

@@ -1,7 +1,13 @@
--- Run after schema.sql, then set RESERVATION_QUEUE_ENABLED=true on Render.
--- Rerunnable three-person upgrade: existing reservations and settings are not replaced.
+-- Run after schema.sql. Queue mode is optional: RESERVATION_QUEUE_ENABLED=true on Render.
+-- Rerunnable upgrade: five equipment channels, three admitted visitors.
+-- Existing reservations, settings and queue tickets are not replaced.
 begin;
 select pg_advisory_xact_lock(910042);
+
+-- Widen the existing channel check without changing records or overlap protection.
+alter table public.pb_bookings drop constraint if exists pb_bookings_channel_check;
+alter table public.pb_bookings add constraint pb_bookings_channel_check
+  check (channel in ('CH 1', 'CH 2', 'CH 3', 'CH 4', 'CH 5'));
 
 create table if not exists public.pb_booking_queue (
   ticket bigint generated always as identity primary key,
@@ -112,7 +118,7 @@ begin
     raise exception 'Invalid booking request';
   end if;
   v_count := jsonb_array_length(p_bookings);
-  if v_count < 1 or v_count > 3 or jsonb_array_length(p_logs) <> v_count
+  if v_count < 1 or v_count > 5 or jsonb_array_length(p_logs) <> v_count
     or (p_mode = 'update' and v_count <> 1) then
     raise exception 'Invalid booking count';
   end if;
