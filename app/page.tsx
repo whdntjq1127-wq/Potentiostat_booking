@@ -1,9 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState, type CSSProperties } from 'react';
-import Link from 'next/link';
 import {
-  formatDateLabelForLanguage,
   formatDateTimeLabelForLanguage,
   formatShortDateLabelForLanguage,
 } from '../lib/i18n';
@@ -12,6 +10,7 @@ import { useReservation } from '../components/reservation-context';
 import { useBookingQueue } from '../components/use-booking-queue';
 import { BookingQueuePanel, QueueTimer, queueCopy } from '../components/booking-queue-panel';
 import { WeeklySchedule, type SelectedSlot } from '../components/weekly-schedule';
+import { BookingOpeningNotice } from '../components/booking-opening-notice';
 import {
   CHANNELS,
   addDays,
@@ -19,7 +18,7 @@ import {
   findActiveBookingConflict,
   getBlockedDateInRange,
   getChannelColor,
-  getLatestBookableDate,
+  getBookingToday,
   addHours,
   getLatestAllowedEnd,
   isStartWithinBookingWindow,
@@ -43,6 +42,7 @@ export default function Home() {
     blockedDates,
     notices,
     settings,
+    error: reservationError,
     cancelBooking,
     refresh,
   } = useReservation();
@@ -133,7 +133,7 @@ export default function Home() {
     const syncNow = () => {
       const current = new Date();
       setNow(current);
-      setWeekAnchor((existing) => existing ?? current);
+      setWeekAnchor((existing) => existing ?? getBookingToday(current));
       setMounted(true);
     };
 
@@ -309,12 +309,16 @@ export default function Home() {
     return (
       <main className="booking-entry-page">
         <section className="booking-start" aria-label={queueText.book}>
+          <BookingOpeningNotice language={language} settings={ready ? settings : null} unavailable={!!reservationError} />
           <button type="button" className="booking-start-button" onClick={() => void startBooking()}
             disabled={!ready || !mounted || !queue.ready || !queue.status || submitting || queue.busy}
             aria-busy={!queue.status || queue.busy}>
             <span>{queueText.book}</span>
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14m-6-6 6 6-6 6" /></svg>
           </button>
+          <p className="booking-entry-hint">
+            {copy.openingNotice.turn}{queue.status?.enabled ? ` ${copy.openingNotice.queue}` : ''}
+          </p>
           {message ? <p role="status" className={`inline-message ${message.ok ? 'success' : 'error'}`}>{message.text}</p> : null}
           {queue.error && !bookingRequested ? <p role="alert" className="inline-message error">{queueText.error}</p> : null}
         </section>
@@ -323,7 +327,6 @@ export default function Home() {
     );
   }
 
-  const latestBookableDate = getLatestBookableDate(settings, now);
   const selectedEndDate = endAt ? endAt.split('T')[0] : '';
   const endDateOptions = availableEndOptions.filter(
     (option, index, list) =>
@@ -361,11 +364,6 @@ export default function Home() {
   return (
     <main className="calendar-page">
       <section className="panel board-panel calendar-panel">
-          <div className="section-head">
-            <div className="calendar-title-block">
-              <div className="eyebrow">{copy.home.weeklyEyebrow}</div>
-              <h2 className="section-title">{copy.home.weeklyTitle}</h2>
-            </div>
             {notices.length > 0 ? (
               <aside className="calendar-notice-panel" aria-label="관리자 공지사항">
                 <div className="calendar-notice-heading">관리자 공지사항</div>
@@ -381,21 +379,6 @@ export default function Home() {
                 </div>
               </aside>
             ) : null}
-            <div className="rule-summary">
-              <span>
-                {copy.home.asOf(formatDateLabelForLanguage(now, language))}
-              </span>
-              <span>
-                {copy.home.lastStartDate(
-                  formatDateLabelForLanguage(latestBookableDate, language),
-                )}
-              </span>
-              <span>{copy.home.bookingUnit}</span>
-              <span>
-                <Link href="/my-bookings">{copy.home.viewMyBookings}</Link>
-              </span>
-            </div>
-          </div>
 
           {message ? (
             <div className={`inline-message ${message.ok ? 'success' : 'error'}`}>

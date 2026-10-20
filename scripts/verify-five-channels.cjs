@@ -55,10 +55,10 @@ async function run() {
     const html = renderToStaticMarkup(React.createElement(WeeklySchedule, {
       anchorDate: now, now, selectedSlot: null, onSelectSlot() {}, onShiftWeek() {},
     }));
-    assert.equal((html.match(/colSpan="5"/gi) || []).length, 7, 'Each day groups five channel columns');
-    assert.equal((html.match(/class="channel-subhead/g) || []).length, 7 * 5);
-    assert.equal((html.match(/class="slot-cell/g) || []).length, 7 * 5 * 24);
-    assert.equal((html.match(/class="slot-cell date-end-cell"/g) || []).length, 7 * 24);
+    assert.equal((html.match(/colSpan="5"/gi) || []).length, 5, 'The initial weekday page groups five channels per day');
+    assert.equal((html.match(/class="channel-subhead/g) || []).length, 5 * 5);
+    assert.equal((html.match(/class="slot-cell/g) || []).length, 5 * 5 * 24);
+    assert.equal((html.match(/class="slot-cell date-end-cell"/g) || []).length, 5 * 24);
     const copy = load(resolve(__dirname, '../lib/i18n.ts')).translations[language];
     assert.match(copy.site.brandSubtitle, /CH 5/, 'Both languages describe all five channels');
   }

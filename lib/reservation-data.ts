@@ -193,6 +193,17 @@ export function getWeekDates(anchorDate: Date) {
   return Array.from({ length: 7 }, (_, index) => addDays(first, index));
 }
 
+export type SchedulePage = 'weekdays' | 'weekend';
+
+export function getSchedulePageDates(anchorDate: Date, page: SchedulePage) {
+  const monday = startOfDay(anchorDate);
+  monday.setDate(monday.getDate() - (monday.getDay() + 6) % 7);
+  const offset = page === 'weekdays' ? 0 : 5;
+  return Array.from({ length: page === 'weekdays' ? 5 : 2 }, (_, index) =>
+    addDays(monday, offset + index),
+  );
+}
+
 export function getSlotRows() {
   const rows: Array<{
     id: string;

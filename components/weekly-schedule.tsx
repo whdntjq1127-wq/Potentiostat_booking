@@ -13,12 +13,13 @@ import {
   findActiveBookingConflict,
   getChannelColor,
   getChannelSoftColor,
-  getWeekDates,
+  getSchedulePageDates,
   isStartWithinBookingWindow,
   setHour,
   toDateKey,
   toDateTimeLocal,
   type Channel,
+  type SchedulePage,
 } from '../lib/reservation-data';
 
 export type SelectedSlot = {
@@ -59,14 +60,12 @@ export function WeeklySchedule({
 }: WeeklyScheduleProps) {
   const { bookings, blockedDates, settings } = useReservation();
   const { copy, language } = useLanguage();
-  const hourRowRefs = useRef<Record<number, HTMLTableRowElement | null>>({});
-  const previousHourRef = useRef<number | null>(null);
   const suppressClickRef = useRef(false);
+  const [schedulePage, setSchedulePage] = useState<SchedulePage>('weekdays');
   const [dragSelection, setDragSelection] = useState<DragSelection | null>(
     null,
   );
-  const weekDates = getWeekDates(anchorDate);
-  const currentHour = now.getHours();
+  const weekDates = getSchedulePageDates(anchorDate, schedulePage);
   const hourGroups = useMemo(
     () =>
       Array.from({ length: 24 }, (_, hour) => ({
@@ -77,25 +76,15 @@ export function WeeklySchedule({
   );
 
   useEffect(() => {
-    const targetRow = hourRowRefs.current[currentHour];
+    setSchedulePage('weekdays');
+    setDragSelection(null);
+  }, [anchorDate]);
 
-    if (!targetRow) {
-      previousHourRef.current = currentHour;
-      return;
-    }
-
-    const nextTop = Math.max(
-      targetRow.getBoundingClientRect().top + window.scrollY - 76,
-      0,
-    );
-    const behavior =
-      previousHourRef.current === null || previousHourRef.current === currentHour
-        ? 'auto'
-        : 'smooth';
-
-    window.scrollTo({ top: nextTop, behavior });
-    previousHourRef.current = currentHour;
-  }, [anchorDate, currentHour]);
+  function changePage(page: SchedulePage) {
+    setSchedulePage(page);
+    setDragSelection(null);
+    suppressClickRef.current = false;
+  }
 
   function getActiveBooking(date: Date, channel: Channel, hour: number) {
     const slotStart = setHour(date, hour);
@@ -296,35 +285,54 @@ export function WeeklySchedule({
 
   return (
     <div className="schedule-shell">
-      <div className="week-toolbar">
+      <div className="schedule-page-toolbar">
         <button
           type="button"
-          className="button-ghost"
-          onClick={() => onShiftWeek(-1)}
+          className="schedule-page-arrow"
+          aria-label={copy.schedule.showWeekdays}
+          disabled={schedulePage === 'weekdays'}
+          onClick={() => changePage('weekdays')}
         >
-          {copy.schedule.previousWeek}
+          &lt;
         </button>
-        <strong>
-          {formatShortDateLabelForLanguage(weekDates[0], language)} -{' '}
-          {formatShortDateLabelForLanguage(
-            weekDates[weekDates.length - 1],
-            language,
-          )}
-        </strong>
+        <div className="schedule-page-heading">
+          <div aria-live="polite" aria-atomic="true">
+            <strong>{copy.schedule[schedulePage]}</strong>
+            <span className="schedule-page-count">{copy.schedule.page(schedulePage === 'weekdays' ? 1 : 2)}</span>
+          </div>
+          <div className="week-toolbar">
+            <button type="button" className="schedule-week-button" onClick={() => { changePage('weekdays'); onShiftWeek(-1); }}>
+              {copy.schedule.previousWeek}
+            </button>
+            <span>
+              {formatShortDateLabelForLanguage(weekDates[0], language)} -{' '}
+              {formatShortDateLabelForLanguage(weekDates[weekDates.length - 1], language)}
+            </span>
+            <button type="button" className="schedule-week-button" onClick={() => { changePage('weekdays'); onShiftWeek(1); }}>
+              {copy.schedule.nextWeek}
+            </button>
+          </div>
+        </div>
         <button
           type="button"
-          className="button-ghost"
-          onClick={() => onShiftWeek(1)}
+          className="schedule-page-arrow"
+          aria-label={copy.schedule.showWeekend}
+          disabled={schedulePage === 'weekend'}
+          onClick={() => changePage('weekend')}
         >
-          {copy.schedule.nextWeek}
+          &gt;
         </button>
       </div>
 
       <div className="schedule-wrap">
         <table
           className="schedule-table"
-          style={{ '--schedule-min-width': `${108 + weekDates.length * CHANNELS.length * 74}px` } as CSSProperties}
+          data-schedule-page={schedulePage}
         >
+          <colgroup>
+            <col className="schedule-time-column" />
+            {weekDates.flatMap((date) => CHANNELS.map((channel) => <col key={`${toDateKey(date)}-${channel}`} />))}
+          </colgroup>
           <thead>
             <tr>
               <th className="corner-cell time-head" rowSpan={2}>
@@ -368,12 +376,7 @@ export function WeeklySchedule({
           </thead>
           <tbody>
             {hourGroups.map((group) => (
-              <tr
-                key={group.hour}
-                ref={(node) => {
-                  hourRowRefs.current[group.hour] = node;
-                }}
-              >
+              <tr key={group.hour}>
                 <th className="time-group-cell">{group.label}</th>
 
                 {weekDates.map((date) =>

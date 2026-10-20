@@ -10,7 +10,7 @@ const en = {
     brandTitle: 'Potentiostat Booking Board',
     brandSubtitle: 'CH 1 - CH 5 integrated booking',
     footer:
-      'This is a browser-only demo. There is no login, and admin rules are stored only in the current browser.',
+      'CH 1 - CH 5 equipment booking. Booking dates open at midnight Korea Standard Time (KST).',
     languageLabel: 'Language',
     languageAriaLabel: 'Select language',
     nav: {
@@ -19,6 +19,21 @@ const en = {
       history: 'Booking Change History',
       admin: 'Admin Settings',
     },
+  },
+  openingNotice: {
+    title: 'Booking opening schedule',
+    headline: (days: number) => days === 2
+      ? 'Every day at 00:00, book two days ahead.'
+      : days === 0 ? 'Every day at 00:00, bookings open for that day.'
+        : `Every day at 00:00, bookings open ${days} ${days === 1 ? 'day' : 'days'} ahead.`,
+    explanation: 'All opening times use Korea Standard Time (KST). Each midnight unlocks one new date.',
+    exampleOpening: 'Example: opens at',
+    exampleDate: 'Newly available date',
+    range: (start: string, end: string) => `Usage date: ${start} 00:00 through ${end} 00:00.`,
+    loading: 'Checking the current booking rules...',
+    unavailable: 'Booking rules could not be loaded. Retrying shortly.',
+    turn: '2 minutes to book after admission.',
+    queue: 'Up to 3 people admitted at a time.',
   },
   home: {
     loadingEyebrow: 'Loading',
@@ -83,7 +98,12 @@ const en = {
   schedule: {
     previousWeek: 'Previous Week',
     nextWeek: 'Next Week',
-    startingTime: 'Starting time',
+    weekdays: 'Weekdays · Mon-Fri',
+    weekend: 'Weekend · Sat-Sun',
+    showWeekdays: 'Show weekdays',
+    showWeekend: 'Show weekend',
+    page: (current: number) => `Page ${current} of 2`,
+    startingTime: 'Time',
     bookedByTitle: (applicant: string) => `${applicant}'s booking`,
     blockedDateTitle: 'This date is blocked by the admin',
     notSelectableTitle: 'This slot cannot be selected',
@@ -96,7 +116,7 @@ const ko: typeof en = {
     brandTitle: '포텐쇼스탯 예약 보드',
     brandSubtitle: 'CH 1 ~ CH 5 통합 예약',
     footer:
-      '이 데모는 브라우저에서만 동작합니다. 로그인은 없으며 관리자 규칙은 현재 브라우저에만 저장됩니다.',
+      'CH 1 ~ CH 5 장비 예약. 예약 날짜는 한국 시간(KST) 자정에 새로 열립니다.',
     languageLabel: '언어',
     languageAriaLabel: '언어 선택',
     nav: {
@@ -105,6 +125,21 @@ const ko: typeof en = {
       history: '예약 변경 내역',
       admin: '관리자 설정',
     },
+  },
+  openingNotice: {
+    title: '예약 오픈 안내',
+    headline: (days: number) => days === 2
+      ? '매일 00:00, 이틀 뒤 예약이 열립니다.'
+      : days === 0 ? '매일 00:00, 당일 예약이 열립니다.'
+        : `매일 00:00, ${days}일 후 예약이 열립니다.`,
+    explanation: '예약 오픈은 한국 시간(KST) 기준입니다. 자정이 되면 새 날짜가 하루씩 열립니다.',
+    exampleOpening: '예시 · 예약 오픈 시각',
+    exampleDate: '새로 예약 가능한 날짜',
+    range: (start: string, end: string) => `이용 시간: ${start} 00:00부터 ${end} 00:00까지`,
+    loading: '현재 예약 규칙을 확인하고 있습니다...',
+    unavailable: '예약 규칙을 불러오지 못했습니다. 잠시 후 다시 확인합니다.',
+    turn: '입장 후 2분 동안 예약할 수 있습니다.',
+    queue: '동시에 최대 3명까지 입장합니다.',
   },
   home: {
     loadingEyebrow: '로딩 중',
@@ -169,7 +204,12 @@ const ko: typeof en = {
   schedule: {
     previousWeek: '이전 주',
     nextWeek: '다음 주',
-    startingTime: '시작 시간',
+    weekdays: '평일 · 월~금',
+    weekend: '주말 · 토~일',
+    showWeekdays: '평일 보기',
+    showWeekend: '주말 보기',
+    page: (current: number) => `${current} / 2 페이지`,
+    startingTime: '시간',
     bookedByTitle: (applicant: string) => `${applicant}님의 예약`,
     blockedDateTitle: '관리자가 차단한 날짜입니다',
     notSelectableTitle: '선택할 수 없는 시간입니다',
